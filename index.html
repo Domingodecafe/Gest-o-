@@ -108,6 +108,7 @@
       const AUTH_KEY = "lado-a-auth-ok";
       const STORAGE_KEY = "lado-a-socios-v2";
       const STATE_API_URL = "https://acpfzhdswmwyaurhixxt.supabase.co/functions/v1/lado-a-state";
+      const APP_VERSION = "login-sync-20260529";
       const loginScreen = document.querySelector("#loginScreen");
       const appShell = document.querySelector("#appShell");
       const loginForm = document.querySelector("#loginForm");
@@ -169,7 +170,7 @@
         loginScreen.hidden = true;
         appShell.hidden = false;
         await loadOnlineData();
-        await import("./app.js");
+        await import(`./app.js?v=${APP_VERSION}`);
       }
 
       loginForm.addEventListener("submit", async (event) => {
