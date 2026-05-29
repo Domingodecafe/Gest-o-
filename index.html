@@ -5,9 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gestão LADO A</title>
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .login-screen {
+        align-items: center;
+        background: #eef3f1;
+        display: grid;
+        inset: 0;
+        padding: 22px;
+        position: fixed;
+        z-index: 100;
+      }
+
+      .login-box {
+        background: #ffffff;
+        border: 1px solid #d7e1de;
+        border-radius: 8px;
+        box-shadow: 0 18px 42px rgba(22, 61, 53, 0.14);
+        display: grid;
+        gap: 14px;
+        margin: 0 auto;
+        max-width: 390px;
+        padding: 24px;
+        width: 100%;
+      }
+
+      .login-box .brand {
+        color: #163d35;
+        margin-bottom: 4px;
+      }
+
+      .login-error {
+        color: #9d351d;
+        font-weight: 800;
+        margin: 0;
+      }
+
+      .app-shell[hidden] {
+        display: none;
+      }
+    </style>
   </head>
   <body>
-    <main class="app-shell">
+    <section class="login-screen" id="loginScreen">
+      <form class="login-box" id="loginForm">
+        <div class="brand">
+          <span class="brand-mark">LA</span>
+          <div>
+            <strong>LADO A</strong>
+            <small>Gestão dos sócios</small>
+          </div>
+        </div>
+        <div>
+          <h1>Acesso dos sócios</h1>
+          <p class="subtle">Digite a senha para abrir o sistema.</p>
+        </div>
+        <label>Senha
+          <input id="passwordInput" type="password" autocomplete="current-password" autofocus />
+        </label>
+        <p class="login-error" id="loginError" hidden>Senha incorreta.</p>
+        <button class="primary-button" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <main class="app-shell" id="appShell" hidden>
       <aside class="sidebar">
         <div class="brand">
           <span class="brand-mark">LA</span>
@@ -44,14 +104,24 @@
     <aside class="drawer" id="drawer" aria-label="Ficha lateral" aria-hidden="true"></aside>
     <div class="toast" id="toast" hidden></div>
     <script type="module">
+      const APP_PASSWORD = "ladoAlondrina";
+      const AUTH_KEY = "lado-a-auth-ok";
       const STORAGE_KEY = "lado-a-socios-v2";
       const STATE_API_URL = "https://acpfzhdswmwyaurhixxt.supabase.co/functions/v1/lado-a-state";
+      const loginScreen = document.querySelector("#loginScreen");
+      const appShell = document.querySelector("#appShell");
+      const loginForm = document.querySelector("#loginForm");
+      const passwordInput = document.querySelector("#passwordInput");
+      const loginError = document.querySelector("#loginError");
       const originalSetItem = localStorage.setItem.bind(localStorage);
       let saveTimer = null;
+      let appStarted = false;
 
       async function loadOnlineData() {
         try {
-          const response = await fetch(STATE_API_URL);
+          const response = await fetch(STATE_API_URL, {
+            headers: { "x-lado-a-password": APP_PASSWORD }
+          });
           if (!response.ok) throw new Error(`Supabase ${response.status}`);
           const payload = await response.json();
           if (payload?.data && Object.keys(payload.data).length) {
@@ -67,7 +137,10 @@
         try {
           const response = await fetch(STATE_API_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-lado-a-password": APP_PASSWORD
+            },
             body: JSON.stringify({ data: JSON.parse(value) })
           });
           if (!response.ok) throw new Error(`Supabase ${response.status}`);
@@ -85,8 +158,29 @@
         }
       };
 
-      await loadOnlineData();
-      await import("./app.js");
+      async function openApp() {
+        if (appStarted) return;
+        appStarted = true;
+        loginScreen.hidden = true;
+        appShell.hidden = false;
+        await loadOnlineData();
+        await import("./app.js");
+      }
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (passwordInput.value !== APP_PASSWORD) {
+          loginError.hidden = false;
+          passwordInput.select();
+          return;
+        }
+        sessionStorage.setItem(AUTH_KEY, "true");
+        await openApp();
+      });
+
+      if (sessionStorage.getItem(AUTH_KEY) === "true") {
+        await openApp();
+      }
     </script>
   </body>
 </html>
