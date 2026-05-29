@@ -175,7 +175,8 @@
 
       loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (passwordInput.value !== APP_PASSWORD) {
+        const typedPassword = passwordInput.value.trim();
+        if (typedPassword.toLowerCase() !== APP_PASSWORD.toLowerCase()) {
           loginError.hidden = false;
           passwordInput.select();
           return;
