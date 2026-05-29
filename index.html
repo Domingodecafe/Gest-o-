@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão LADO A</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">LA</span>
+          <div>
+            <strong>LADO A</strong>
+            <small>Gestão dos sócios</small>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Navegação principal">
+          <button class="active" data-view="painel">Painel</button>
+          <button data-view="turmas">Turmas e Vagas</button>
+          <button data-view="alunos">Alunos</button>
+          <button data-view="espera">Lista de Espera</button>
+          <button data-view="oficinas">Oficinas</button>
+          <button data-view="financeiro">Financeiro</button>
+        </nav>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Unidade LADO A</p>
+            <h1 id="pageTitle">Painel</h1>
+          </div>
+        </header>
+
+        <section class="summary-grid" id="summary"></section>
+        <section id="view"></section>
+      </section>
+    </main>
+
+    <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+    <aside class="drawer" id="drawer" aria-label="Ficha lateral" aria-hidden="true"></aside>
+    <div class="toast" id="toast" hidden></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
