@@ -45,32 +45,17 @@
     <div class="toast" id="toast" hidden></div>
     <script type="module">
       const STORAGE_KEY = "lado-a-socios-v2";
-      const SUPABASE_URL = "https://acpfzhdswmwyaurhixxt.supabase.co";
-      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjcGZ6aGRzd213eWF1cmhpeHh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzgyOTUsImV4cCI6MjA5NTY1NDI5NX0.idiype-ATNmzMrXpz_8bTM8Opy9AYzf52-JH8tPTO7g";
-      const SUPABASE_STATE_ID = "lado-a-main";
+      const STATE_API_URL = "https://acpfzhdswmwyaurhixxt.supabase.co/functions/v1/lado-a-state";
       const originalSetItem = localStorage.setItem.bind(localStorage);
       let saveTimer = null;
 
-      async function supabaseRequest(path, options = {}) {
-        const response = await fetch(`${SUPABASE_URL}${path}`, {
-          ...options,
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-            "Content-Type": "application/json",
-            ...(options.headers || {})
-          }
-        });
-        if (!response.ok) throw new Error(`Supabase ${response.status}`);
-        return response;
-      }
-
       async function loadOnlineData() {
         try {
-          const response = await supabaseRequest(`/rest/v1/app_state?id=eq.${SUPABASE_STATE_ID}&select=data`, { method: "GET" });
-          const rows = await response.json();
-          if (Array.isArray(rows) && rows[0]?.data && Object.keys(rows[0].data).length) {
-            originalSetItem(STORAGE_KEY, JSON.stringify(rows[0].data));
+          const response = await fetch(STATE_API_URL);
+          if (!response.ok) throw new Error(`Supabase ${response.status}`);
+          const payload = await response.json();
+          if (payload?.data && Object.keys(payload.data).length) {
+            originalSetItem(STORAGE_KEY, JSON.stringify(payload.data));
           }
           window.__ladoAOnline = true;
         } catch {
@@ -80,15 +65,12 @@
 
       async function saveOnlineData(value) {
         try {
-          await supabaseRequest("/rest/v1/app_state", {
+          const response = await fetch(STATE_API_URL, {
             method: "POST",
-            headers: { Prefer: "resolution=merge-duplicates" },
-            body: JSON.stringify({
-              id: SUPABASE_STATE_ID,
-              data: JSON.parse(value),
-              updated_at: new Date().toISOString()
-            })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: JSON.parse(value) })
           });
+          if (!response.ok) throw new Error(`Supabase ${response.status}`);
           window.__ladoAOnline = true;
         } catch {
           window.__ladoAOnline = false;
