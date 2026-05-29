@@ -117,6 +117,11 @@
       let saveTimer = null;
       let appStarted = false;
 
+      function setOnlineStatus(online) {
+        window.__ladoAOnline = online;
+        window.dispatchEvent(new CustomEvent("lado-a-online-change", { detail: { online } }));
+      }
+
       async function loadOnlineData() {
         try {
           const response = await fetch(STATE_API_URL, {
@@ -127,9 +132,9 @@
           if (payload?.data && Object.keys(payload.data).length) {
             originalSetItem(STORAGE_KEY, JSON.stringify(payload.data));
           }
-          window.__ladoAOnline = true;
+          setOnlineStatus(true);
         } catch {
-          window.__ladoAOnline = false;
+          setOnlineStatus(false);
         }
       }
 
@@ -144,9 +149,9 @@
             body: JSON.stringify({ data: JSON.parse(value) })
           });
           if (!response.ok) throw new Error(`Supabase ${response.status}`);
-          window.__ladoAOnline = true;
+          setOnlineStatus(true);
         } catch {
-          window.__ladoAOnline = false;
+          setOnlineStatus(false);
         }
       }
 
