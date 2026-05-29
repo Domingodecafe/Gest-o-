@@ -43,6 +43,68 @@
     <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
     <aside class="drawer" id="drawer" aria-label="Ficha lateral" aria-hidden="true"></aside>
     <div class="toast" id="toast" hidden></div>
-    <script src="./app.js"></script>
+    <script type="module">
+      const STORAGE_KEY = "lado-a-socios-v2";
+      const SUPABASE_URL = "https://acpfzhdswmwyaurhixxt.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_iLbMPvAcvj6XYsQt1Cjj0g_ntO9Hp41";
+      const SUPABASE_STATE_ID = "lado-a-main";
+      const originalSetItem = localStorage.setItem.bind(localStorage);
+      let saveTimer = null;
+
+      async function supabaseRequest(path, options = {}) {
+        const response = await fetch(`${SUPABASE_URL}${path}`, {
+          ...options,
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+          }
+        });
+        if (!response.ok) throw new Error(`Supabase ${response.status}`);
+        return response;
+      }
+
+      async function loadOnlineData() {
+        try {
+          const response = await supabaseRequest(`/rest/v1/app_state?id=eq.${SUPABASE_STATE_ID}&select=data`, { method: "GET" });
+          const rows = await response.json();
+          if (Array.isArray(rows) && rows[0]?.data && Object.keys(rows[0].data).length) {
+            originalSetItem(STORAGE_KEY, JSON.stringify(rows[0].data));
+          }
+          window.__ladoAOnline = true;
+        } catch {
+          window.__ladoAOnline = false;
+        }
+      }
+
+      async function saveOnlineData(value) {
+        try {
+          await supabaseRequest("/rest/v1/app_state", {
+            method: "POST",
+            headers: { Prefer: "resolution=merge-duplicates" },
+            body: JSON.stringify({
+              id: SUPABASE_STATE_ID,
+              data: JSON.parse(value),
+              updated_at: new Date().toISOString()
+            })
+          });
+          window.__ladoAOnline = true;
+        } catch {
+          window.__ladoAOnline = false;
+        }
+      }
+
+      localStorage.setItem = function patchedSetItem(key, value) {
+        originalSetItem(key, value);
+        if (key === STORAGE_KEY) {
+          window.clearTimeout(saveTimer);
+          saveTimer = window.setTimeout(() => saveOnlineData(value), 500);
+        }
+      };
+
+      await loadOnlineData();
+      await import("./app.js");
+    </script>
   </body>
 </html>
