@@ -542,7 +542,7 @@ function financeSummary() {
   const expectedRevenue = sumAmounts(revenueRows);
   const fixedCosts = sumAmounts(fixedRows);
   const variableCosts = sumAmounts(variableRows);
-  const therapistCosts = sumAmounts(expenseRows.filter((item) => item.center === "Terapeutas"));
+  const therapistCosts = sumAmounts(visibleTherapistFinanceRows());
   const totalCosts = fixedCosts + variableCosts + therapistCosts;
   const realizedProfit = receivedRevenue - totalCosts;
   const expectedProfit = expectedRevenue - totalCosts;
@@ -594,7 +594,7 @@ function financeGroup(title, description, rows) {
 
 function therapistFinanceGroup() {
   const therapists = therapistsFromWorkshops();
-  const rows = financeRowsForCurrentMonth().filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado");
+  const rows = visibleTherapistFinanceRows(therapists);
   const total = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   return `
     <article class="record-card">
@@ -1432,6 +1432,13 @@ function classEnrollmentFields(group) {
       <p class="drawer-note">${occupancy.free} vaga(s) livre(s) de ${group.capacity}.</p>
     </section>
   `;
+}
+
+function visibleTherapistFinanceRows(therapists = therapistsFromWorkshops()) {
+  return therapists
+    .map((name) => financeForTherapist(name))
+    .filter(Boolean)
+    .filter((item) => item.status !== "Cancelado");
 }
 
 function workshopStudentFields(workshop) {
