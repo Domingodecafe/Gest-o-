@@ -292,7 +292,6 @@ function classCard(group) {
       </ul>
       <div class="card-actions">
         <button class="soft-button" data-open="class:${group.id}">Ver/Editar</button>
-        <button class="soft-button" data-open="enrollment:${group.id}" ${occupancy.free <= 0 || group.status !== "Ativa" ? "disabled" : ""}>Matricular</button>
         <button class="danger-button" data-delete-record="class:${group.id}">Excluir</button>
       </div>
     </article>
@@ -343,7 +342,6 @@ function studentCard(student) {
       </ul>
       <div class="card-actions">
         <button class="soft-button" data-open="student:${student.id}">Ver/Editar</button>
-        <button class="soft-button" data-open="studentEnrollment:${student.id}" ${student.status !== "Ativo" ? "disabled" : ""}>Matricular</button>
         <button class="danger-button" data-delete-record="student:${student.id}">Excluir</button>
       </div>
     </article>
