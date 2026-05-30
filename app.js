@@ -165,6 +165,7 @@ function metrics() {
 }
 
 function renderSummary() {
+  const data = metrics();
   if (activeView === "oficinas") {
     renderWorkshopSummary(data);
     return;

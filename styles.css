@@ -11,6 +11,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 button,
@@ -18,6 +19,7 @@ input,
 select,
 textarea {
   font: inherit;
+  max-width: 100%;
 }
 
 button {
@@ -33,6 +35,8 @@ button:disabled {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   min-height: 100vh;
+  min-width: 0;
+  width: 100%;
 }
 
 .sidebar {
@@ -46,6 +50,7 @@ button:disabled {
   display: flex;
   gap: 12px;
   margin-bottom: 28px;
+  min-width: 0;
 }
 
 .brand-mark {
@@ -73,6 +78,9 @@ button:disabled {
 .nav-list {
   display: grid;
   gap: 7px;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
 }
 
 .nav-list button {
@@ -147,6 +155,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .unit-chip,
@@ -210,6 +219,7 @@ h3 {
   font-weight: 850;
   min-height: 38px;
   padding: 9px 12px;
+  white-space: nowrap;
 }
 
 .ghost-button {
@@ -314,6 +324,7 @@ button.summary-card {
 
 .record-card,
 .decision-card {
+  min-width: 0;
   padding: 15px;
 }
 
@@ -421,6 +432,10 @@ button.summary-card {
   gap: 12px;
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 12px 0;
+}
+
+.data-row > div {
+  min-width: 0;
 }
 
 .data-row:first-child {
@@ -583,12 +598,14 @@ textarea:focus {
 @media (max-width: 1120px) {
   .app-shell {
     grid-template-columns: 1fr;
+    overflow-x: hidden;
   }
 
   .sidebar {
     position: sticky;
     top: 0;
     z-index: 5;
+    width: 100%;
   }
 
   .brand {
@@ -617,24 +634,183 @@ textarea:focus {
 }
 
 @media (max-width: 720px) {
+  :root {
+    font-size: 14px;
+  }
+
   .workspace,
   .sidebar {
-    padding: 16px;
+    padding: 14px;
+  }
+
+  .sidebar {
+    box-shadow: 0 8px 22px rgba(12, 32, 27, 0.18);
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .brand {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .brand-mark {
+    border-radius: 7px;
+    height: 38px;
+    width: 38px;
+  }
+
+  .nav-list {
+    gap: 6px;
+    margin: 0 -14px;
+    padding: 0 14px 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-list button {
+    min-height: 40px;
+    padding: 9px 11px;
+    scroll-snap-align: start;
+  }
+
+  .workspace {
+    max-width: 100vw;
+    overflow: hidden;
+    padding-top: 18px;
+    width: 100%;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+  }
+
+  h2 {
+    font-size: 1.08rem;
   }
 
   .topbar,
   .section-head,
-  .data-row,
   .record-card header,
   .decision-card header {
     align-items: flex-start;
-    grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .topbar,
+  .section-head {
+    gap: 10px;
+  }
+
+  .top-actions,
+  .row-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .section-head .primary-button,
+  .section-head .soft-button,
+  .section-head .danger-button {
+    width: 100%;
   }
 
   .summary-grid,
   .records-grid,
+  .finance-result-grid,
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .summary-card {
+    min-height: 74px;
+  }
+
+  .record-card,
+  .decision-card,
+  .panel {
+    padding: 14px;
+  }
+
+  .data-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .data-row .row-actions,
+  .card-actions,
+  .drawer-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .card-actions button,
+  .data-row .row-actions button,
+  .drawer-actions button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .inline-list {
+    gap: 7px;
+  }
+
+  .tag,
+  .pill {
+    line-height: 1.15;
+  }
+
+  .drawer {
+    border-radius: 0;
+    box-shadow: none;
+    height: 100dvh;
+    left: 0;
+    max-width: none;
+    padding: 14px;
+    right: 0;
+    width: 100vw;
+  }
+
+  .drawer-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .drawer form {
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .workspace,
+  .sidebar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .nav-list {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .summary-card strong,
+  .finance-result-total strong {
+    font-size: 1.22rem;
+  }
+
+  .panel,
+  .record-card,
+  .decision-card,
+  .summary-card,
+  .finance-result-card,
+  .cost-list {
+    border-radius: 7px;
   }
 }
