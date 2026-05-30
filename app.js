@@ -1,13 +1,13 @@
-const STORAGE_KEY = "lado-a-socios-v2";
-const centers = ["Operação", "Terapeutas", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
+﻿const STORAGE_KEY = "lado-a-socios-v2";
+const centers = ["OperaÃ§Ã£o", "Terapeutas", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
 
 const seed = {
   plans: [
-    { id: "basico", name: "Básico", monthly: 680 },
+    { id: "basico", name: "BÃ¡sico", monthly: 680 },
     { id: "completo", name: "Completo", monthly: 980 }
   ],
   students: [
-    { id: "ana", name: "Ana Luiza", birthDate: "2012-08-14", guardian: "Mariana", phone: "(11) 99911-0001", planId: "completo", status: "Ativo", notes: "Prefere horário da manhã." },
+    { id: "ana", name: "Ana Luiza", birthDate: "2012-08-14", guardian: "Mariana", phone: "(11) 99911-0001", planId: "completo", status: "Ativo", notes: "Prefere horÃ¡rio da manhÃ£." },
     { id: "bruno", name: "Bruno Martins", birthDate: "2011-11-03", guardian: "Paulo", phone: "(11) 99922-0002", planId: "basico", status: "Ativo", notes: "" },
     { id: "clara", name: "Clara Rocha", birthDate: "2013-04-22", guardian: "Fernanda", phone: "(11) 99933-0003", planId: "completo", status: "Ativo", notes: "" },
     { id: "davi", name: "Davi Nunes", birthDate: "1998-02-09", guardian: "Silvia", phone: "(11) 99944-0004", planId: "basico", status: "Ativo", notes: "Aguardando vaga em turma adulta." },
@@ -16,7 +16,7 @@ const seed = {
   classes: [
     { id: "turma-adolescentes-a", name: "Adolescentes A", category: "Adolescentes", weekday: "Segunda", start: "09:00", end: "10:30", therapist: "Camila", room: "Sala 1", capacity: 4, status: "Ativa" },
     { id: "turma-adultos-b", name: "Adultos B", category: "Adultos", weekday: "Quarta", start: "14:00", end: "15:30", therapist: "Renata", room: "Sala 2", capacity: 5, status: "Ativa" },
-    { id: "turma-formacao", name: "Adolescentes C", category: "Adolescentes", weekday: "Sexta", start: "16:00", end: "17:30", therapist: "Camila", room: "Sala 1", capacity: 6, status: "Em formação" }
+    { id: "turma-formacao", name: "Adolescentes C", category: "Adolescentes", weekday: "Sexta", start: "16:00", end: "17:30", therapist: "Camila", room: "Sala 1", capacity: 6, status: "Em formaÃ§Ã£o" }
   ],
   enrollments: [
     { id: "mat-1", studentId: "ana", classId: "turma-adolescentes-a", status: "Ativa", startDate: "2026-05-01" },
@@ -27,16 +27,16 @@ const seed = {
   waitlist: [
     { id: "esp-1", name: "Lucas Henrique", guardian: "Patricia", phone: "(11) 98888-1001", interest: "Plano Completo", status: "Aguardando", notes: "Prefere quarta ou sexta." },
     { id: "esp-2", name: "Sofia Mendes", guardian: "Andre", phone: "(11) 97777-1002", interest: "Oficina", status: "Aguardando", notes: "" },
-    { id: "esp-3", name: "Rafael Lima", guardian: "Carla", phone: "(11) 96666-1003", interest: "Plano Básico", status: "Aguardando", notes: "Interessado em adolescentes." }
+    { id: "esp-3", name: "Rafael Lima", guardian: "Carla", phone: "(11) 96666-1003", interest: "Plano BÃ¡sico", status: "Aguardando", notes: "Interessado em adolescentes." }
   ],
   workshops: [
     { id: "of-arte", name: "Oficina de Arte", type: "Avulsa", date: "2026-06-08", weekday: "", start: "11:00", end: "12:00", therapist: "Livia", capacity: 8, participants: 5, status: "Aberta" },
     { id: "of-social", name: "Habilidades Sociais", type: "Recorrente", date: "", weekday: "Sexta", start: "17:00", end: "18:00", therapist: "Renata", capacity: 10, participants: 4, status: "Planejada" }
   ],
   finance: [
-    { id: "fin-1", type: "Mensalidade", description: "Ana Luiza", amount: 980, date: "2026-05-05", status: "Pago", center: "Operação", relatedType: "Aluno", relatedId: "ana" },
-    { id: "fin-2", type: "Mensalidade", description: "Bruno Martins", amount: 680, date: "2026-05-05", status: "Atrasado", center: "Operação", relatedType: "Aluno", relatedId: "bruno" },
-    { id: "fin-3", type: "Mensalidade", description: "Clara Rocha", amount: 980, date: "2026-05-05", status: "Pago", center: "Operação", relatedType: "Aluno", relatedId: "clara" },
+    { id: "fin-1", type: "Mensalidade", description: "Ana Luiza", amount: 980, date: "2026-05-05", status: "Pago", center: "OperaÃ§Ã£o", relatedType: "Aluno", relatedId: "ana" },
+    { id: "fin-2", type: "Mensalidade", description: "Bruno Martins", amount: 680, date: "2026-05-05", status: "Atrasado", center: "OperaÃ§Ã£o", relatedType: "Aluno", relatedId: "bruno" },
+    { id: "fin-3", type: "Mensalidade", description: "Clara Rocha", amount: 980, date: "2026-05-05", status: "Pago", center: "OperaÃ§Ã£o", relatedType: "Aluno", relatedId: "clara" },
     { id: "fin-4", type: "Receita", description: "Oficina de Arte", amount: 640, date: "2026-05-18", status: "Pago", center: "Oficinas", relatedType: "Oficina", relatedId: "of-arte" },
     { id: "fin-5", type: "Despesa", description: "Repasse Livia", amount: 2200, date: "2026-05-28", status: "Pago", center: "Terapeutas", relatedType: "Terapeuta", relatedId: "Livia" },
     { id: "fin-6", type: "Despesa", description: "Aluguel da unidade", amount: 1800, date: "2026-05-10", status: "Pago", center: "Estrutura", relatedType: "Geral", relatedId: "" }
@@ -123,7 +123,7 @@ function normalizeFinanceRelation(item) {
 }
 
 function cleanFinanceDescription(description) {
-  return String(description || "").replace(/\s+-\s+(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i, "");
+  return String(description || "").replace(/\s+-\s+(janeiro|fevereiro|marÃ§o|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i, "");
 }
 
 function saveState() {
@@ -165,7 +165,6 @@ function metrics() {
 }
 
 function renderSummary() {
-  const data = metrics();
   if (activeView === "oficinas") {
     renderWorkshopSummary(data);
     return;
@@ -173,7 +172,7 @@ function renderSummary() {
   const cards = [
     ["Alunos ativos", data.activeStudents, "alunos"],
     ["Vagas livres", data.freeSlots, "turmas"],
-    ["Ocupação", `${data.occupancyRate.toFixed(0)}%`, "turmas"],
+    ["OcupaÃ§Ã£o", `${data.occupancyRate.toFixed(0)}%`, "turmas"],
     ["Fila de espera", data.waiting, "espera"]
   ];
   summaryEl.innerHTML = cards.map(([label, value, target]) => `<button class="summary-card" data-go="${target}"><span>${label}</span><strong>${value}</strong></button>`).join("");
@@ -191,7 +190,7 @@ function renderWorkshopSummary(data) {
   const cards = [
     ["Inscritos em oficinas", workshopParticipants, "oficinas"],
     ["Vagas livres", workshopFreeSlots, "oficinas"],
-    ["Ocupação", `${workshopOccupancy.toFixed(0)}%`, "oficinas"],
+    ["OcupaÃ§Ã£o", `${workshopOccupancy.toFixed(0)}%`, "oficinas"],
     ["Fila de espera", data.waiting, "espera"]
   ];
   summaryEl.innerHTML = cards.map(([label, value, target]) => `<button class="summary-card" data-go="${target}"><span>${label}</span><strong>${value}</strong></button>`).join("");
@@ -199,14 +198,12 @@ function renderWorkshopSummary(data) {
 
 function renderDashboard() {
   titleEl.textContent = "Painel";
-  const data = metrics();
   viewEl.innerHTML = `
-    <div class="screen-grid">
-      <section class="panel">
+    <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Operação da unidade</h2>
-            <p>Resumo para decisões dos sócios, sem rotina de recepção ou chamada.</p>
+            <h2>OperaÃ§Ã£o da unidade</h2>
+            <p>Resumo para decisÃµes dos sÃ³cios, sem rotina de recepÃ§Ã£o ou chamada.</p>
           </div>
           <button class="primary-button" data-open="class:new">Nova turma</button>
         </div>
@@ -214,15 +211,6 @@ function renderDashboard() {
           ${decisionCards().join("")}
         </div>
       </section>
-      <aside class="panel">
-        <h2>Financeiro do mês</h2>
-        <div class="stack">
-          <article class="summary-card"><span>Receitas pagas</span><strong>${currency(data.revenue)}</strong></article>
-          <article class="summary-card"><span>Despesas</span><strong>${currency(data.expenses)}</strong></article>
-          <article class="summary-card"><span>Mensalidades pendentes</span><strong>${data.overdue}</strong></article>
-        </div>
-      </aside>
-    </div>
   `;
 }
 
@@ -230,12 +218,12 @@ function decisionCards() {
   const rows = [];
   state.classes.filter((item) => item.status === "Ativa").forEach((group) => {
     const occupancy = classOccupancy(group);
-    if (occupancy.free === 0) rows.push(["red", `${group.name} está cheia`, "Ver interessados da fila antes de abrir novas matrículas.", "turmas"]);
-    if (occupancy.rate < 45) rows.push(["yellow", `${group.name} com baixa ocupação`, "Revisar lista de espera compatível ou divulgar a turma.", "turmas"]);
+    if (occupancy.free === 0) rows.push(["red", `${group.name} estÃ¡ cheia`, "Ver interessados da fila antes de abrir novas matrÃ­culas.", "turmas"]);
+    if (occupancy.rate < 45) rows.push(["yellow", `${group.name} com baixa ocupaÃ§Ã£o`, "Revisar lista de espera compatÃ­vel ou divulgar a turma.", "turmas"]);
   });
-  if (metrics().waiting > 0 && metrics().freeSlots > 0) rows.push(["green", "Há fila e vagas livres", "Cruzar interessados com turmas disponíveis.", "espera"]);
-  if (metrics().overdue > 0) rows.push(["yellow", "Mensalidades pendentes", "Revisar financeiro antes do fechamento do mês.", "financeiro"]);
-  if (!rows.length) rows.push(["green", "Operação sem alertas críticos", "Ocupação e financeiro estão organizados no exemplo atual.", "painel"]);
+  if (metrics().waiting > 0 && metrics().freeSlots > 0) rows.push(["green", "HÃ¡ fila e vagas livres", "Cruzar interessados com turmas disponÃ­veis.", "espera"]);
+  if (metrics().overdue > 0) rows.push(["yellow", "Mensalidades pendentes", "Revisar financeiro antes do fechamento do mÃªs.", "financeiro"]);
+  if (!rows.length) rows.push(["green", "OperaÃ§Ã£o sem alertas crÃ­ticos", "OcupaÃ§Ã£o e financeiro estÃ£o organizados no exemplo atual.", "painel"]);
   return rows.map(([tone, title, text, target]) => `
     <article class="decision-card">
       <header>
@@ -243,9 +231,9 @@ function decisionCards() {
           <h3>${title}</h3>
           <p class="subtle">${text}</p>
         </div>
-        <span class="tag ${tone}">${tone === "red" ? "Crítico" : tone === "yellow" ? "Atenção" : "Ok"}</span>
+        <span class="tag ${tone}">${tone === "red" ? "CrÃ­tico" : tone === "yellow" ? "AtenÃ§Ã£o" : "Ok"}</span>
       </header>
-      <button class="soft-button" data-go="${target}">Abrir área</button>
+      <button class="soft-button" data-go="${target}">Abrir Ã¡rea</button>
     </article>
   `);
 }
@@ -257,7 +245,7 @@ function renderClasses() {
       <div class="section-head">
         <div>
           <h2>Turmas semanais</h2>
-          <p>Controle de capacidade, matrículas e vagas disponíveis.</p>
+          <p>Controle de capacidade, matrÃ­culas e vagas disponÃ­veis.</p>
         </div>
         <button class="primary-button" data-open="class:new">Nova turma</button>
       </div>
@@ -288,7 +276,7 @@ function classCard(group) {
       </div>
       <ul class="mini-list">
         <li>Matriculados: ${students.map((student) => student.name).join(", ") || "Nenhum aluno"}</li>
-        <li>Fila compatível: ${compatible.map((item) => item.name).join(", ") || "Sem interessados compatíveis"}</li>
+        <li>Fila compatÃ­vel: ${compatible.map((item) => item.name).join(", ") || "Sem interessados compatÃ­veis"}</li>
       </ul>
       <div class="card-actions">
         <button class="soft-button" data-open="class:${group.id}">Ver/Editar</button>
@@ -304,7 +292,7 @@ function renderStudents() {
     <section class="panel">
       <div class="section-head">
         <div>
-          <h2>Alunos e matrículas</h2>
+          <h2>Alunos e matrÃ­culas</h2>
           <p>Cadastro, plano, status financeiro e vinculos com turmas.</p>
         </div>
         <button class="primary-button" data-open="student:new">Novo aluno</button>
@@ -338,7 +326,7 @@ function studentCard(student) {
         <li>Idade: ${ageLabel(student.birthDate)}</li>
         <li>Plano contratado: ${plan.name}</li>
         <li>Turmas: ${classes.map((item) => item.name).join(", ") || "Sem turma ativa"}</li>
-        <li>Observações: ${student.notes || "Sem observações"}</li>
+        <li>ObservaÃ§Ãµes: ${student.notes || "Sem observaÃ§Ãµes"}</li>
       </ul>
       <div class="card-actions">
         <button class="soft-button" data-open="student:${student.id}">Ver/Editar</button>
@@ -355,7 +343,7 @@ function renderWaitlist() {
       <div class="section-head">
         <div>
           <h2>Interessados</h2>
-          <p>Fila usada pelos sócios para ocupar vagas disponíveis.</p>
+          <p>Fila usada pelos sÃ³cios para ocupar vagas disponÃ­veis.</p>
         </div>
         <button class="primary-button" data-open="wait:new">Novo interessado</button>
       </div>
@@ -378,7 +366,7 @@ function waitCard(item) {
       </header>
       <ul class="mini-list">
         <li>Interesse: ${item.interest}</li>
-        <li>Observações: ${item.notes || "Sem observações"}</li>
+        <li>ObservaÃ§Ãµes: ${item.notes || "Sem observaÃ§Ãµes"}</li>
       </ul>
       <div class="card-actions">
         <button class="soft-button" data-open="wait:${item.id}">Ver/Editar</button>
@@ -437,15 +425,15 @@ function renderFinance() {
       <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Financeiro por área</h2>
-            <p>Mensalidades, repasses e custos separados para leitura rápida.</p>
+            <h2>Financeiro por Ã¡rea</h2>
+            <p>Mensalidades, repasses e custos separados para leitura rÃ¡pida.</p>
           </div>
           <div class="row-actions">
             <button class="primary-button" data-open="student:new">Novo aluno</button>
           </div>
         </div>
         <div class="stack">
-          ${financeGroup("Mensalidade dos alunos", `Recebimentos do mês ${currentCompetenceLabel()} vinculados aos alunos.`, currentTuitionRows())}
+          ${financeGroup("Mensalidade dos alunos", `Recebimentos do mÃªs ${currentCompetenceLabel()} vinculados aos alunos.`, currentTuitionRows())}
           ${therapistFinanceGroup()}
           ${costsFinanceGroup()}
         </div>
@@ -461,8 +449,8 @@ function financeResultPanel() {
     <aside class="panel finance-result-panel">
       <div class="section-head">
         <div>
-          <h2>Resultado do mês</h2>
-          <p>Entradas, custos e lucro organizados por competência.</p>
+          <h2>Resultado do mÃªs</h2>
+          <p>Entradas, custos e lucro organizados por competÃªncia.</p>
         </div>
         <span class="tag blue">${currentCompetenceLabel()}</span>
       </div>
@@ -470,7 +458,7 @@ function financeResultPanel() {
         ${financeResultCard("Entradas recebidas", data.receivedRevenue)}
         ${financeResultCard("Entradas previstas", data.expectedRevenue)}
         ${financeResultCard("Custos fixos", data.fixedCosts)}
-        ${financeResultCard("Custos variáveis", data.variableCosts)}
+        ${financeResultCard("Custos variÃ¡veis", data.variableCosts)}
         ${financeResultCard("Repasses terapeutas", data.therapistCosts)}
         ${financeResultCard("Total de custos", data.totalCosts)}
       </div>
@@ -554,7 +542,7 @@ function financeGroup(title, description, rows) {
         <span class="tag blue">${currency(total)}</span>
       </header>
       <div class="stack">
-        ${rows.length ? rows.map(financeRow).join("") : `<p class="empty">Nenhum lançamento nesta caixa.</p>`}
+        ${rows.length ? rows.map(financeRow).join("") : `<p class="empty">Nenhum lanÃ§amento nesta caixa.</p>`}
       </div>
     </article>
   `;
@@ -594,7 +582,7 @@ function costsFinanceGroup() {
     <article class="record-card">
       <header>
         <div>
-          <h3>Custos fixos e variáveis</h3>
+          <h3>Custos fixos e variÃ¡veis</h3>
           <p class="subtle">Custos separados por tipo para leitura e controle.</p>
         </div>
         <div class="row-actions">
@@ -604,7 +592,7 @@ function costsFinanceGroup() {
       </header>
       <div class="stack">
         ${costList("Custos fixos", fixedRows)}
-        ${costList("Custos variáveis", variableRows)}
+        ${costList("Custos variÃ¡veis", variableRows)}
       </div>
     </article>
   `;
@@ -621,7 +609,7 @@ function costList(title, rows) {
         <span class="tag blue">${currency(total)}</span>
       </div>
       <div class="stack">
-        ${rows.length ? rows.map(costRow).join("") : `<p class="empty">Nenhum lançamento nesta lista.</p>`}
+        ${rows.length ? rows.map(costRow).join("") : `<p class="empty">Nenhum lanÃ§amento nesta lista.</p>`}
       </div>
     </section>
   `;
@@ -629,7 +617,7 @@ function costList(title, rows) {
 
 function costKind(item) {
   if (item.costType === "Fixo") return "fixo";
-  if (item.costType === "Variável") return "variavel";
+  if (item.costType === "VariÃ¡vel") return "variavel";
   return ["Estrutura", "Administrativo"].includes(item.center) ? "fixo" : "variavel";
 }
 
@@ -685,7 +673,7 @@ function financeDetail(item) {
   if (item.type === "Mensalidade" && item.relatedType === "Aluno") {
     const student = studentById(item.relatedId);
     const plan = student ? planById(student.planId) : null;
-    return `Competência: ${competenceLabel(item.competence)} | Vencimento: ${item.date || "Não informado"} | Pacote contratado: ${plan?.name || "Não informado"} | ${currency(Number(item.amount || 0))}`;
+    return `CompetÃªncia: ${competenceLabel(item.competence)} | Vencimento: ${item.date || "NÃ£o informado"} | Pacote contratado: ${plan?.name || "NÃ£o informado"} | ${currency(Number(item.amount || 0))}`;
   }
   if (item.type === "Despesa" && item.center === "Terapeutas") {
     const therapist = therapistNameForFinance(item);
@@ -711,7 +699,7 @@ function workshopNamesForTherapist(therapist) {
   const names = state.workshops
     .filter((item) => (!therapist || item.therapist === therapist) && item.status !== "Cancelada")
     .map((item) => item.name);
-  return names.length ? names.join(", ") : "Não informada";
+  return names.length ? names.join(", ") : "NÃ£o informada";
 }
 
 function therapistsFromWorkshops() {
@@ -736,7 +724,7 @@ function durationHours(start, end) {
 }
 
 function formatHours(hours) {
-  if (!hours) return "Não informada";
+  if (!hours) return "NÃ£o informada";
   return `${hours.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h`;
 }
 
@@ -786,7 +774,7 @@ function drawerTemplate(kind, record, isEdit) {
     <form id="drawerForm">
       ${fieldsFor(kind, record)}
       <div class="drawer-actions">
-        <button class="primary-button" type="submit">Salvar alterações</button>
+        <button class="primary-button" type="submit">Salvar alteraÃ§Ãµes</button>
         <button class="ghost-button" type="button" data-close>Cancelar</button>
         ${isEdit && kind !== "tuition" ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
       </div>
@@ -880,7 +868,7 @@ function saveRecord(kind, id, values) {
       const index = collection.findIndex((item) => item.id === id);
       collection[index] = { ...collection[index], ...prepared };
       syncTuitionForStudent(studentId, { forcePlanAmount: previousPlanId !== prepared.planId });
-      notify("Alterações salvas.");
+      notify("AlteraÃ§Ãµes salvas.");
     } else {
       collection.unshift({ ...prepared, id: studentId, createdAt: today() });
       syncTuitionForStudent(studentId, { forcePlanAmount: true });
@@ -892,7 +880,7 @@ function saveRecord(kind, id, values) {
   if (id) {
     const index = collection.findIndex((item) => item.id === id);
     collection[index] = { ...collection[index], ...prepared };
-    notify("Alterações salvas.");
+    notify("AlteraÃ§Ãµes salvas.");
   } else {
     collection.unshift({ ...prepared, id: makeId(kind) });
     notify("Registro criado.");
@@ -908,17 +896,17 @@ function createEnrollment(values) {
     return false;
   }
   if (classOccupancy(group).free <= 0) {
-    notify("Turma sem vaga disponível.");
+    notify("Turma sem vaga disponÃ­vel.");
     return false;
   }
   const exists = state.enrollments.some((item) => item.studentId === values.studentId && item.classId === values.classId && item.status === "Ativa");
   if (exists) {
-    notify("Aluno já está matriculado nessa turma.");
+    notify("Aluno jÃ¡ estÃ¡ matriculado nessa turma.");
     return false;
   }
   state.enrollments.unshift({ id: makeId("enrollment"), studentId: values.studentId, classId: values.classId, status: "Ativa", startDate: values.startDate || today() });
   saveState();
-  notify("Matrícula criada.");
+  notify("MatrÃ­cula criada.");
   return true;
 }
 
@@ -948,7 +936,7 @@ function createTuition(values) {
     amount: Number(values.amount || plan.monthly),
     date: values.date || billingDateForStudent(student, competence),
     status: values.status || "Pendente",
-    center: "Operação",
+    center: "OperaÃ§Ã£o",
     relatedType: "Aluno",
     relatedId: student.id,
     competence
@@ -966,7 +954,7 @@ function saveTherapist(values) {
   }
   const workshop = state.workshops.find((item) => item.id === values.workshopId);
   if (!workshop) {
-    notify("Oficina não encontrada.");
+    notify("Oficina nÃ£o encontrada.");
     return false;
   }
   workshop.therapist = name;
@@ -992,7 +980,7 @@ function saveTherapist(values) {
     });
   }
   saveState();
-  notify("Terapeuta vinculado à oficina.");
+  notify("Terapeuta vinculado Ã  oficina.");
   return true;
 }
 
@@ -1030,34 +1018,34 @@ function deleteRecord(kind, id) {
   if (!id) return;
   if (kind === "student") {
     const student = state.students.find((item) => item.id === id);
-    if (!student) return notify("Aluno nÃ£o encontrado.");
+    if (!student) return notify("Aluno nÃƒÂ£o encontrado.");
     state.students = state.students.filter((item) => item.id !== id);
     state.enrollments = state.enrollments.filter((item) => item.studentId !== id);
     state.finance = state.finance.filter((item) => !(item.relatedType === "Aluno" && item.relatedId === id));
-    notify("Aluno excluÃ­do.");
+    notify("Aluno excluÃƒÂ­do.");
   } else if (kind === "class") {
     const group = state.classes.find((item) => item.id === id);
-    if (!group) return notify("Turma nÃ£o encontrada.");
+    if (!group) return notify("Turma nÃƒÂ£o encontrada.");
     state.classes = state.classes.filter((item) => item.id !== id);
     state.enrollments = state.enrollments.filter((item) => item.classId !== id);
     state.finance = state.finance.filter((item) => !(item.relatedType === "Turma" && item.relatedId === id));
-    notify("Turma excluÃ­da.");
+    notify("Turma excluÃƒÂ­da.");
   } else if (kind === "wait") {
     const lead = state.waitlist.find((item) => item.id === id);
-    if (!lead) return notify("Interessado nÃ£o encontrado.");
+    if (!lead) return notify("Interessado nÃƒÂ£o encontrado.");
     state.waitlist = state.waitlist.filter((item) => item.id !== id);
-    notify("Interessado excluÃ­do.");
+    notify("Interessado excluÃƒÂ­do.");
   } else if (kind === "workshop") {
     const workshop = state.workshops.find((item) => item.id === id);
-    if (!workshop) return notify("Oficina nÃ£o encontrada.");
+    if (!workshop) return notify("Oficina nÃƒÂ£o encontrada.");
     state.workshops = state.workshops.filter((item) => item.id !== id);
     state.finance = state.finance.filter((item) => !(item.relatedType === "Oficina" && item.relatedId === id));
-    notify("Oficina excluÃ­da.");
+    notify("Oficina excluÃƒÂ­da.");
   } else if (kind === "therapist") {
     const before = state.finance.length;
     state.finance = state.finance.filter((item) => !(item.relatedType === "Terapeuta" && item.relatedId === id));
-    if (state.finance.length === before) return notify("Repasse nÃ£o encontrado.");
-    notify("Repasse excluÃ­do.");
+    if (state.finance.length === before) return notify("Repasse nÃƒÂ£o encontrado.");
+    notify("Repasse excluÃƒÂ­do.");
   } else if (kind === "finance" || kind === "cost") {
     deleteFinance(id);
     return;
@@ -1070,24 +1058,24 @@ function deleteRecord(kind, id) {
 function deleteCost(id) {
   const item = state.finance.find((entry) => entry.id === id && entry.type === "Despesa" && entry.center !== "Terapeutas");
   if (!item) {
-    notify("Custo não encontrado.");
+    notify("Custo nÃ£o encontrado.");
     return;
   }
   state.finance = state.finance.filter((entry) => entry.id !== id);
   saveState();
-  notify("Custo excluído.");
+  notify("Custo excluÃ­do.");
   render();
 }
 
 function deleteFinance(id) {
   const item = state.finance.find((entry) => entry.id === id);
   if (!item) {
-    notify("Lançamento não encontrado.");
+    notify("LanÃ§amento nÃ£o encontrado.");
     return;
   }
   state.finance = state.finance.filter((entry) => entry.id !== id);
   saveState();
-  notify("Lançamento excluído.");
+  notify("LanÃ§amento excluÃ­do.");
   render();
 }
 
@@ -1112,13 +1100,13 @@ function fieldsFor(kind, record) {
         ${inputField("birthDate", "Data de nascimento", record.birthDate, "date")}
         ${inputField("age", "Idade", ageLabel(record.birthDate), "text", "readonly")}
       </div>
-      ${inputField("guardian", "Responsável", record.guardian)}
+      ${inputField("guardian", "ResponsÃ¡vel", record.guardian)}
       ${inputField("phone", "Telefone", record.phone)}
       <div class="field-grid">
         ${selectField("planId", "Plano", state.plans.map((item) => [item.id, item.name]), record.planId)}
         ${selectField("status", "Status", ["Ativo", "Inativo", "Cancelado"], record.status)}
       </div>
-      ${textField("notes", "Observações", record.notes)}
+      ${textField("notes", "ObservaÃ§Ãµes", record.notes)}
     `;
   }
   if (kind === "class") {
@@ -1126,30 +1114,30 @@ function fieldsFor(kind, record) {
       ${inputField("name", "Nome da turma", record.name)}
       <div class="field-grid">
         ${selectField("category", "Categoria", ["Adolescentes", "Adultos"], record.category)}
-        ${selectField("weekday", "Dia da semana", ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"], record.weekday)}
+        ${selectField("weekday", "Dia da semana", ["Segunda", "TerÃ§a", "Quarta", "Quinta", "Sexta", "SÃ¡bado"], record.weekday)}
       </div>
       <div class="field-grid">
-        ${inputField("start", "Horário início", record.start, "time")}
-        ${inputField("end", "Horário fim", record.end, "time")}
+        ${inputField("start", "HorÃ¡rio inÃ­cio", record.start, "time")}
+        ${inputField("end", "HorÃ¡rio fim", record.end, "time")}
       </div>
       ${inputField("therapist", "Terapeuta", record.therapist)}
       <div class="field-grid">
         ${inputField("room", "Sala", record.room)}
         ${inputField("capacity", "Capacidade", record.capacity, "number")}
       </div>
-      ${selectField("status", "Status", ["Ativa", "Em formação", "Encerrada"], record.status)}
+      ${selectField("status", "Status", ["Ativa", "Em formaÃ§Ã£o", "Encerrada"], record.status)}
     `;
   }
   if (kind === "wait") {
     return `
       ${inputField("name", "Nome", record.name)}
-      ${inputField("guardian", "Responsável", record.guardian)}
+      ${inputField("guardian", "ResponsÃ¡vel", record.guardian)}
       ${inputField("phone", "Telefone", record.phone)}
       <div class="field-grid">
-        ${selectField("interest", "Interesse", ["Plano Básico", "Plano Completo", "Oficina", "Serviço Avulso"], record.interest)}
+        ${selectField("interest", "Interesse", ["Plano BÃ¡sico", "Plano Completo", "Oficina", "ServiÃ§o Avulso"], record.interest)}
         ${selectField("status", "Status", ["Aguardando", "Convertido", "Desistiu"], record.status)}
       </div>
-      ${textField("notes", "Observações", record.notes)}
+      ${textField("notes", "ObservaÃ§Ãµes", record.notes)}
     `;
   }
   if (kind === "workshop") {
@@ -1160,12 +1148,12 @@ function fieldsFor(kind, record) {
         ${selectField("status", "Status", ["Planejada", "Aberta", "Encerrada", "Cancelada"], record.status)}
       </div>
       <div class="field-grid">
-        ${selectField("weekday", "Dia recorrente", ["", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"], record.weekday)}
+        ${selectField("weekday", "Dia recorrente", ["", "Segunda", "TerÃ§a", "Quarta", "Quinta", "Sexta", "SÃ¡bado"], record.weekday)}
         ${inputField("date", "Data avulsa", record.date, "date")}
       </div>
       <div class="field-grid">
-        ${inputField("start", "Horário início", record.start, "time")}
-        ${inputField("end", "Horário fim", record.end, "time")}
+        ${inputField("start", "HorÃ¡rio inÃ­cio", record.start, "time")}
+        ${inputField("end", "HorÃ¡rio fim", record.end, "time")}
       </div>
       ${inputField("therapist", "Terapeuta", record.therapist)}
       <div class="field-grid">
@@ -1183,7 +1171,7 @@ function fieldsFor(kind, record) {
         ${selectField("type", "Tipo", ["Mensalidade", "Receita", "Despesa"], record.type)}
         ${selectField("status", "Status", ["Pago", "Pendente", "Atrasado", "Isento", "Cancelado"], record.status)}
       </div>
-      ${inputField("description", "Descrição", record.description)}
+      ${inputField("description", "DescriÃ§Ã£o", record.description)}
       <div class="field-grid">
         ${inputField("amount", "Valor", record.amount, "number")}
         ${inputField("date", "Data", record.date, "date")}
@@ -1202,7 +1190,7 @@ function fieldsFor(kind, record) {
       ${hiddenInput("relatedId", "")}
       ${inputField("description", "Nome do custo", record.description)}
       <div class="field-grid">
-        ${selectField("costType", "Tipo de custo", ["Fixo", "Variável"], record.costType || (costKind(record) === "fixo" ? "Fixo" : "Variável"))}
+        ${selectField("costType", "Tipo de custo", ["Fixo", "VariÃ¡vel"], record.costType || (costKind(record) === "fixo" ? "Fixo" : "VariÃ¡vel"))}
         ${selectField("status", "Status", ["Pago", "Pendente", "Atrasado", "Cancelado"], record.status)}
       </div>
       <div class="field-grid">
@@ -1216,7 +1204,7 @@ function fieldsFor(kind, record) {
     return `
       ${selectField("studentId", "Aluno", state.students.filter((item) => item.status === "Ativo").map((item) => [item.id, `${item.name} - ${planById(item.planId).name}`]), "")}
       <div class="field-grid">
-        ${inputField("competence", "Competência", currentCompetence())}
+        ${inputField("competence", "CompetÃªncia", currentCompetence())}
         ${inputField("date", "Vencimento/data", today(), "date")}
       </div>
       <div class="field-grid">
@@ -1238,9 +1226,9 @@ function fieldsFor(kind, record) {
 function defaultsFor(kind) {
   if (kind === "student") return { name: "", birthDate: "", guardian: "", phone: "", planId: "basico", status: "Ativo", notes: "" };
   if (kind === "class") return { name: "", category: "Adolescentes", weekday: "Segunda", start: "09:00", end: "10:30", therapist: "", room: "", capacity: 6, status: "Ativa" };
-  if (kind === "wait") return { name: "", guardian: "", phone: "", interest: "Plano Básico", status: "Aguardando", notes: "" };
+  if (kind === "wait") return { name: "", guardian: "", phone: "", interest: "Plano BÃ¡sico", status: "Aguardando", notes: "" };
   if (kind === "workshop") return { name: "", type: "Avulsa", date: today(), weekday: "", start: "10:00", end: "11:00", therapist: "", capacity: 10, participants: 0, status: "Planejada" };
-  if (kind === "finance") return { type: "Receita", description: "", amount: 0, date: today(), status: "Pago", center: "Operação", relatedType: "Geral", relatedId: "" };
+  if (kind === "finance") return { type: "Receita", description: "", amount: 0, date: today(), status: "Pago", center: "OperaÃ§Ã£o", relatedType: "Geral", relatedId: "" };
   if (kind === "cost") return { type: "Despesa", description: "", costType: "Fixo", amount: 0, date: today(), status: "Pago", center: "Estrutura", relatedType: "Geral", relatedId: "" };
   return {};
 }
@@ -1252,37 +1240,37 @@ function tuitionFinanceFields(record) {
   return `
     ${hiddenInput("type", "Mensalidade")}
     ${hiddenInput("description", student?.name || record.description)}
-    ${hiddenInput("center", "Operação")}
+    ${hiddenInput("center", "OperaÃ§Ã£o")}
     ${hiddenInput("relatedType", "Aluno")}
     ${hiddenInput("relatedId", record.relatedId)}
     <section class="drawer-section">
       <h3>Dados cadastrais</h3>
       ${readonlyField("Nome do aluno", student?.name || record.description)}
       <div class="field-grid">
-        ${readonlyField("Responsável", student?.guardian || "Não informado")}
-        ${readonlyField("Telefone", student?.phone || "Não informado")}
+        ${readonlyField("ResponsÃ¡vel", student?.guardian || "NÃ£o informado")}
+        ${readonlyField("Telefone", student?.phone || "NÃ£o informado")}
       </div>
       <div class="field-grid">
-        ${readonlyField("Data de nascimento", student?.birthDate || "Não informada")}
+        ${readonlyField("Data de nascimento", student?.birthDate || "NÃ£o informada")}
         ${readonlyField("Idade", ageLabel(student?.birthDate))}
       </div>
     </section>
     <section class="drawer-section">
       <h3>Pacote contratado</h3>
       <div class="field-grid">
-        ${readonlyField("Plano", plan?.name || "Não informado")}
+        ${readonlyField("Plano", plan?.name || "NÃ£o informado")}
         ${readonlyField("Valor do plano", currency(Number(plan?.monthly || record.amount || 0)))}
       </div>
       <div class="field-grid">
-        ${readonlyField("Data de contratação", contractDate || "Não informada")}
-        ${inputField("competence", "Competência", record.competence || currentCompetence(), "month")}
+        ${readonlyField("Data de contrataÃ§Ã£o", contractDate || "NÃ£o informada")}
+        ${inputField("competence", "CompetÃªncia", record.competence || currentCompetence(), "month")}
       </div>
       <div class="field-grid">
-        ${inputField("date", "Vencimento do mês", record.date || billingDateForStudent(student, record.competence || currentCompetence()), "date")}
+        ${inputField("date", "Vencimento do mÃªs", record.date || billingDateForStudent(student, record.competence || currentCompetence()), "date")}
         ${inputField("amount", "Valor da mensalidade", record.amount, "number", "readonly")}
       </div>
-      ${selectField("status", "Status deste mês", ["Pendente", "Pago", "Atrasado", "Isento", "Cancelado"], record.status)}
-      <p class="drawer-note">A cada nova competência mensal, o app cria uma mensalidade pendente. O sócio altera manualmente o status deste mês.</p>
+      ${selectField("status", "Status deste mÃªs", ["Pendente", "Pago", "Atrasado", "Isento", "Cancelado"], record.status)}
+      <p class="drawer-note">A cada nova competÃªncia mensal, o app cria uma mensalidade pendente. O sÃ³cio altera manualmente o status deste mÃªs.</p>
     </section>
   `;
 }
@@ -1323,7 +1311,7 @@ function collectionFor(kind) {
 }
 
 function drawerTitle(kind, isEdit) {
-  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lançamento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta" };
+  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lanÃ§amento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta" };
   return `${isEdit ? "Editar" : "Criar"} ${names[kind] || "registro"}`;
 }
 
@@ -1364,7 +1352,7 @@ function enrollmentsForClass(classId) {
 function compatibleWaitlist(group) {
   return state.waitlist.filter((item) => {
     if (item.status !== "Aguardando") return false;
-    if (["Oficina", "Serviço Avulso", "Servico Avulso"].includes(item.interest)) return false;
+    if (["Oficina", "ServiÃ§o Avulso", "Servico Avulso"].includes(item.interest)) return false;
     if (group.category === "Adolescentes") return item.notes.toLowerCase().includes("adolesc") || item.interest.includes("Plano");
     return item.interest.includes("Plano");
   });
@@ -1410,7 +1398,7 @@ function syncTuitionForStudent(studentId, options = {}) {
 
   tuition.description = student.name;
   tuition.type = "Mensalidade";
-  tuition.center = "Operação";
+  tuition.center = "OperaÃ§Ã£o";
   tuition.relatedType = "Aluno";
   tuition.relatedId = student.id;
   if (options.forcePlanAmount) tuition.amount = Number(plan?.monthly || 0);
@@ -1428,7 +1416,7 @@ function createStudentTuition(student, competence = currentCompetence()) {
     amount: Number(plan?.monthly || 0),
     date: billingDateForStudent(student, competence),
     status: "Pendente",
-    center: "Operação",
+    center: "OperaÃ§Ã£o",
     relatedType: "Aluno",
     relatedId: student.id,
     competence
@@ -1477,9 +1465,9 @@ function monthKey(dateValue) {
 }
 
 function competenceLabel(competence) {
-  if (!competence) return "Não informada";
+  if (!competence) return "NÃ£o informada";
   const [year, month] = String(competence).split("-");
-  const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const monthNames = ["janeiro", "fevereiro", "marÃ§o", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const monthIndex = Number(month) - 1;
   return monthNames[monthIndex] ? `${monthNames[monthIndex]}/${year}` : competence;
 }
@@ -1499,7 +1487,7 @@ function billingDateForStudent(student, competence = currentCompetence()) {
 
 function ageLabel(dateValue) {
   const age = calculateAge(dateValue);
-  return age === null ? "Não informada" : `${age} anos`;
+  return age === null ? "NÃ£o informada" : `${age} anos`;
 }
 
 function calculateAge(dateValue) {
@@ -1523,7 +1511,7 @@ function formatPercent(value) {
 
 function statusPill(status) {
   const normalized = displayText(status);
-  const color = ["Ativo", "Ativa", "Aberta", "Aguardando", "Pago"].includes(normalized) ? "paid" : ["Pendente", "Atrasado", "Em formação", "Planejada"].includes(normalized) ? "pending" : "neutral";
+  const color = ["Ativo", "Ativa", "Aberta", "Aguardando", "Pago"].includes(normalized) ? "paid" : ["Pendente", "Atrasado", "Em formaÃ§Ã£o", "Planejada"].includes(normalized) ? "pending" : "neutral";
   return `<span class="pill ${color}">${normalized}</span>`;
 }
 
@@ -1535,14 +1523,14 @@ function financePill(status) {
 
 function displayText(value) {
   const map = {
-    Basico: "Básico",
-    "Plano Basico": "Plano Básico",
-    "Servico Avulso": "Serviço Avulso",
-    Operacao: "Operação",
-    "Em formacao": "Em formação",
-    Terca: "Terça",
-    Sabado: "Sábado",
-    "Nao informada": "Não informada"
+    Basico: "BÃ¡sico",
+    "Plano Basico": "Plano BÃ¡sico",
+    "Servico Avulso": "ServiÃ§o Avulso",
+    Operacao: "OperaÃ§Ã£o",
+    "Em formacao": "Em formaÃ§Ã£o",
+    Terca: "TerÃ§a",
+    Sabado: "SÃ¡bado",
+    "Nao informada": "NÃ£o informada"
   };
   return map[value] || value || "";
 }
