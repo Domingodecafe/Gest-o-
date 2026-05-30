@@ -443,7 +443,7 @@ function renderFinance() {
             <p>Mensalidades, repasses e custos separados para leitura rápida.</p>
           </div>
           <div class="row-actions">
-            <button class="primary-button" data-open="finance:new">Novo lançamento</button>
+            <button class="primary-button" data-open="student:new">Novo aluno</button>
           </div>
         </div>
         <div class="stack">
