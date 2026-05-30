@@ -103,7 +103,8 @@ function normalizeState(data) {
   normalized.workshops = normalized.workshops.map((item) => ({
     ...item,
     weekday: displayText(item.weekday),
-    status: displayText(item.status)
+    status: displayText(item.status),
+    studentIds: Array.isArray(item.studentIds) ? item.studentIds : []
   }));
   normalized.finance = normalized.finance.map((item) => ({
     ...item,
@@ -226,7 +227,7 @@ function renderWorkshopSummary(data) {
     .reduce((sum, item) => sum + Number(item.capacity || 0), 0);
   const workshopParticipants = state.workshops
     .filter((item) => item.status !== "Cancelada")
-    .reduce((sum, item) => sum + Number(item.participants || 0), 0);
+    .reduce((sum, item) => sum + workshopParticipantsCount(item), 0);
   const workshopFreeSlots = Math.max(workshopCapacity - workshopParticipants, 0);
   const workshopOccupancy = workshopCapacity ? (workshopParticipants / workshopCapacity) * 100 : 0;
   const cards = [
@@ -438,7 +439,8 @@ function renderWorkshops() {
 }
 
 function workshopCard(item) {
-  const free = Math.max(Number(item.capacity || 0) - Number(item.participants || 0), 0);
+  const participants = workshopParticipantsCount(item);
+  const free = workshopFreeSlots(item);
   return `
     <article class="record-card">
       <header>
@@ -450,7 +452,7 @@ function workshopCard(item) {
       </header>
       <div class="inline-list">
         <span class="tag ${free > 0 ? "green" : "red"}">${free} vagas</span>
-        <span class="tag blue">${item.participants}/${item.capacity} inscritos</span>
+        <span class="tag blue">${participants}/${item.capacity} inscritos</span>
       </div>
       <div class="card-actions">
         <button class="soft-button" data-open="workshop:${item.id}">Ver/Editar</button>
@@ -839,6 +841,7 @@ function bindDrawerForm(kind, id) {
   }
   if (kind === "finance") bindTuitionFinanceForm();
   if (kind === "class") bindClassEnrollmentForm(id);
+  if (kind === "workshop") bindWorkshopStudentForm(id);
   drawerEl.querySelector("#drawerForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target).entries());
@@ -846,6 +849,24 @@ function bindDrawerForm(kind, id) {
     if (ok) {
       closeDrawer();
       render();
+    }
+  });
+}
+
+function bindWorkshopStudentForm(workshopId) {
+  const addButton = drawerEl.querySelector("[data-add-student-to-workshop]");
+  if (!addButton) return;
+  addButton.addEventListener("click", () => {
+    const studentId = drawerEl.querySelector('select[name="newWorkshopStudentId"]')?.value || "";
+    if (!studentId) {
+      notify("Selecione um aluno para adicionar.");
+      return;
+    }
+    if (addStudentToWorkshop(workshopId, studentId)) {
+      render();
+      const workshop = state.workshops.find((item) => item.id === workshopId);
+      drawerEl.innerHTML = drawerTemplate("workshop", workshop, true);
+      bindDrawerForm("workshop", workshopId);
     }
   });
 }
@@ -1007,6 +1028,29 @@ function createEnrollment(values) {
   return true;
 }
 
+function addStudentToWorkshop(workshopId, studentId) {
+  const workshop = state.workshops.find((item) => item.id === workshopId);
+  const student = studentById(studentId);
+  if (!workshop || !student) {
+    notify("Selecione aluno e oficina.");
+    return false;
+  }
+  workshop.studentIds = Array.isArray(workshop.studentIds) ? workshop.studentIds : [];
+  if (workshop.studentIds.includes(studentId)) {
+    notify("Aluno já está inscrito nessa oficina.");
+    return false;
+  }
+  if (workshopFreeSlots(workshop) <= 0) {
+    notify("Oficina sem vaga disponível.");
+    return false;
+  }
+  workshop.studentIds.push(studentId);
+  workshop.participants = workshopParticipantsCount(workshop);
+  saveState();
+  notify("Aluno adicionado à oficina.");
+  return true;
+}
+
 function saveTuitionFinance(id, values) {
   const tuition = state.finance.find((item) => item.id === id);
   const student = studentById(values.relatedId);
@@ -1149,6 +1193,11 @@ function deleteRecord(kind, id) {
     if (!student) return notify("Aluno não encontrado.");
     state.students = state.students.filter((item) => item.id !== id);
     state.enrollments = state.enrollments.filter((item) => item.studentId !== id);
+    state.workshops = state.workshops.map((item) => ({
+      ...item,
+      studentIds: workshopStudentIds(item).filter((studentId) => studentId !== id),
+      participants: Math.max(Number(item.participants || 0) - (workshopStudentIds(item).includes(id) ? 1 : 0), 0)
+    }));
     state.finance = state.finance.filter((item) => !(item.relatedType === "Aluno" && item.relatedId === id));
     notify("Aluno excluído.");
   } else if (kind === "class") {
@@ -1287,8 +1336,9 @@ function fieldsFor(kind, record) {
       ${inputField("therapist", "Terapeuta", record.therapist)}
       <div class="field-grid">
         ${inputField("capacity", "Capacidade", record.capacity, "number")}
-        ${inputField("participants", "Participantes", record.participants, "number")}
+        ${inputField("participants", "Participantes", workshopParticipantsCount(record), "number")}
       </div>
+      ${record.id ? workshopStudentFields(record) : ""}
     `;
   }
   if (kind === "finance") {
@@ -1387,6 +1437,31 @@ function classEnrollmentFields(group) {
   `;
 }
 
+function workshopStudentFields(workshop) {
+  const free = workshopFreeSlots(workshop);
+  const studentIds = workshopStudentIds(workshop);
+  const students = studentIds.map((id) => studentById(id)).filter(Boolean);
+  const options = [["", free > 0 ? "Selecione um aluno" : "Oficina sem vaga"]];
+  if (free > 0) {
+    state.students
+      .filter((student) => student.status === "Ativo" && !studentIds.includes(student.id))
+      .forEach((student) => options.push([student.id, student.name]));
+  }
+  return `
+    <section class="drawer-section">
+      <h3>Alunos da oficina</h3>
+      <p class="drawer-note">Inscritos: ${students.map((student) => student.name).join(", ") || "Nenhum aluno vinculado"}.</p>
+      <div class="field-grid">
+        ${selectField("newWorkshopStudentId", "Adicionar aluno", options, "")}
+        ${readonlyField("Vagas livres", `${free} de ${workshop.capacity}`)}
+      </div>
+      <div class="row-actions">
+        <button class="soft-button" type="button" data-add-student-to-workshop ${free <= 0 || options.length <= 1 ? "disabled" : ""}>Adicionar aluno</button>
+      </div>
+    </section>
+  `;
+}
+
 function tuitionFinanceFields(record) {
   const student = studentById(record.relatedId);
   const plan = student ? planById(student.planId) : null;
@@ -1446,6 +1521,10 @@ function prepareRecord(kind, id, values) {
     delete prepared.newStudentId;
     delete prepared.enrollmentStartDate;
   }
+  if (kind === "workshop") {
+    delete prepared.newWorkshopStudentId;
+    prepared.studentIds = Array.isArray(prepared.studentIds) ? prepared.studentIds : (id ? (state.workshops.find((item) => item.id === id)?.studentIds || []) : []);
+  }
   if (kind === "cost") {
     prepared.type = "Despesa";
     prepared.relatedType = "Geral";
@@ -1500,6 +1579,18 @@ function classOccupancy(group) {
   const active = enrollmentsForClass(group.id).length;
   const capacity = Number(group.capacity || 0);
   return { occupied: active, free: Math.max(capacity - active, 0), rate: capacity ? (active / capacity) * 100 : 0 };
+}
+
+function workshopStudentIds(workshop) {
+  return Array.isArray(workshop?.studentIds) ? workshop.studentIds : [];
+}
+
+function workshopParticipantsCount(workshop) {
+  return Math.max(Number(workshop?.participants || 0), workshopStudentIds(workshop).length);
+}
+
+function workshopFreeSlots(workshop) {
+  return Math.max(Number(workshop?.capacity || 0) - workshopParticipantsCount(workshop), 0);
 }
 
 function enrollmentsForClass(classId) {
