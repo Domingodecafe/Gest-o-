@@ -434,7 +434,6 @@ function workshopCard(item) {
 
 function renderFinance() {
   titleEl.textContent = "Financeiro";
-  const data = metrics();
   viewEl.innerHTML = `
     <div class="screen-grid">
       <section class="panel">
@@ -454,16 +453,94 @@ function renderFinance() {
           ${costsFinanceGroup()}
         </div>
       </section>
-      <aside class="panel">
-        <h2>Resultado</h2>
-        <div class="stack">
-          <article class="summary-card"><span>Receitas pagas</span><strong>${currency(data.revenue)}</strong></article>
-          <article class="summary-card"><span>Despesas</span><strong>${currency(data.expenses)}</strong></article>
-          <article class="summary-card"><span>Lucro estimado</span><strong>${currency(data.profit)}</strong></article>
-        </div>
-      </aside>
+      ${financeResultPanel()}
     </div>
   `;
+}
+
+function financeResultPanel() {
+  const data = financeSummary();
+  return `
+    <aside class="panel finance-result-panel">
+      <div class="section-head">
+        <div>
+          <h2>Resultado do mês</h2>
+          <p>Entradas, custos e lucro organizados por competência.</p>
+        </div>
+        <span class="tag blue">${currentCompetenceLabel()}</span>
+      </div>
+      <div class="finance-result-grid">
+        ${financeResultCard("Entradas recebidas", data.receivedRevenue)}
+        ${financeResultCard("Entradas previstas", data.expectedRevenue)}
+        ${financeResultCard("Custos fixos", data.fixedCosts)}
+        ${financeResultCard("Custos variáveis", data.variableCosts)}
+        ${financeResultCard("Repasses terapeutas", data.therapistCosts)}
+        ${financeResultCard("Total de custos", data.totalCosts)}
+      </div>
+      <div class="finance-result-total ${data.realizedProfit < 0 ? "negative" : "positive"}">
+        <span>Resultado com entradas recebidas</span>
+        <strong>${currency(data.realizedProfit)}</strong>
+      </div>
+      <div class="finance-result-total secondary ${data.expectedProfit < 0 ? "negative" : "positive"}">
+        <span>Resultado se tudo for recebido</span>
+        <strong>${currency(data.expectedProfit)}</strong>
+      </div>
+      <div class="finance-result-note">
+        <span>${data.openRevenueCount} entrada(s) pendente(s)</span>
+        <span>Margem recebida: ${formatPercent(data.realizedMargin)}</span>
+      </div>
+    </aside>
+  `;
+}
+
+function financeResultCard(label, value) {
+  return `
+    <article class="finance-result-card">
+      <span>${label}</span>
+      <strong>${currency(value)}</strong>
+    </article>
+  `;
+}
+
+function financeSummary() {
+  const rows = financeRowsForCurrentMonth().filter((item) => item.status !== "Cancelado");
+  const revenueRows = rows.filter((item) => item.type !== "Despesa" && item.status !== "Isento");
+  const expenseRows = rows.filter((item) => item.type === "Despesa");
+  const costRows = expenseRows.filter((item) => item.center !== "Terapeutas");
+  const fixedRows = costRows.filter((item) => costKind(item) === "fixo");
+  const variableRows = costRows.filter((item) => costKind(item) === "variavel");
+  const receivedRevenue = sumAmounts(revenueRows.filter((item) => item.status === "Pago"));
+  const expectedRevenue = sumAmounts(revenueRows);
+  const fixedCosts = sumAmounts(fixedRows);
+  const variableCosts = sumAmounts(variableRows);
+  const therapistCosts = sumAmounts(expenseRows.filter((item) => item.center === "Terapeutas"));
+  const totalCosts = fixedCosts + variableCosts + therapistCosts;
+  const realizedProfit = receivedRevenue - totalCosts;
+  const expectedProfit = expectedRevenue - totalCosts;
+  return {
+    receivedRevenue,
+    expectedRevenue,
+    fixedCosts,
+    variableCosts,
+    therapistCosts,
+    totalCosts,
+    realizedProfit,
+    expectedProfit,
+    realizedMargin: receivedRevenue ? (realizedProfit / receivedRevenue) * 100 : 0,
+    openRevenueCount: revenueRows.filter((item) => ["Pendente", "Atrasado"].includes(item.status)).length
+  };
+}
+
+function financeRowsForCurrentMonth() {
+  const current = currentCompetence();
+  return state.finance.filter((item) => {
+    if (item.type === "Mensalidade") return item.competence === current;
+    return monthKey(item.date || today()) === current;
+  });
+}
+
+function sumAmounts(rows) {
+  return rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 }
 
 function financeGroup(title, description, rows) {
@@ -488,7 +565,7 @@ function financeGroup(title, description, rows) {
 
 function therapistFinanceGroup() {
   const therapists = therapistsFromWorkshops();
-  const rows = state.finance.filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado");
+  const rows = financeRowsForCurrentMonth().filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado");
   const total = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   return `
     <article class="record-card">
@@ -510,7 +587,7 @@ function therapistFinanceGroup() {
 }
 
 function costsFinanceGroup() {
-  const rows = state.finance.filter((item) => item.type === "Despesa" && item.center !== "Terapeutas");
+  const rows = financeRowsForCurrentMonth().filter((item) => item.type === "Despesa" && item.center !== "Terapeutas");
   const fixedRows = rows.filter((item) => costKind(item) === "fixo");
   const variableRows = rows.filter((item) => costKind(item) === "variavel");
   const total = rows
@@ -648,7 +725,8 @@ function therapistsFromWorkshops() {
 }
 
 function financeForTherapist(name) {
-  return state.finance.find((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado" && therapistNameForFinance(item) === name);
+  const rows = state.finance.filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado" && therapistNameForFinance(item) === name);
+  return rows.find((item) => monthKey(item.date || today()) === currentCompetence()) || rows[0];
 }
 
 function durationHours(start, end) {
@@ -1367,6 +1445,10 @@ function calculateAge(dateValue) {
 
 function currency(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+}
+
+function formatPercent(value) {
+  return `${Number(value || 0).toFixed(0)}%`;
 }
 
 function statusPill(status) {
