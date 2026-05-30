@@ -130,6 +130,7 @@ function repairText(value) {
     ["Opera\ufffd\ufffdo", "Operação"], ["Opera??o", "Operação"], ["forma\ufffd\ufffdo", "formação"], ["forma??o", "formação"],
     ["Gest\ufffdo", "Gestão"], ["s\ufffdcios", "sócios"], ["S\ufffdcio", "Sócio"], ["s\ufffdcio", "sócio"],
     ["Navega\ufffd\ufffdo", "Navegação"], ["n\ufffdo", "não"], ["N\ufffdo", "Não"],
+    ["Ot\ufffdvio", "Otávio"], ["Ter\ufffda", "Terça"], ["hor\ufffdrio", "horário"], ["manh\ufffd", "manhã"],
     ["A\ufffd\ufffdo", "Ação"], ["A??o", "Ação"], ["a\ufffd\ufffdo", "ação"], ["a??o", "ação"],
     ["Valida\ufffd\ufffdo", "Validação"], ["Valida??o", "Validação"],
     ["contrata\ufffd\ufffdo", "contratação"], ["contrata??o", "contratação"],
