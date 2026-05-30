@@ -838,6 +838,7 @@ function bindDrawerForm(kind, id) {
     }
   }
   if (kind === "finance") bindTuitionFinanceForm();
+  if (kind === "class") bindClassEnrollmentForm(id);
   drawerEl.querySelector("#drawerForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target).entries());
@@ -845,6 +846,25 @@ function bindDrawerForm(kind, id) {
     if (ok) {
       closeDrawer();
       render();
+    }
+  });
+}
+
+function bindClassEnrollmentForm(classId) {
+  const addButton = drawerEl.querySelector("[data-add-student-to-class]");
+  if (!addButton) return;
+  addButton.addEventListener("click", () => {
+    const studentId = drawerEl.querySelector('select[name="newStudentId"]')?.value || "";
+    const startDate = drawerEl.querySelector('input[name="enrollmentStartDate"]')?.value || today();
+    if (!studentId) {
+      notify("Selecione um aluno para adicionar.");
+      return;
+    }
+    if (createEnrollment({ studentId, classId, startDate })) {
+      render();
+      const group = classById(classId);
+      drawerEl.innerHTML = drawerTemplate("class", group, true);
+      bindDrawerForm("class", classId);
     }
   });
 }
@@ -946,11 +966,6 @@ function saveRecord(kind, id, values) {
     if (id) {
       const index = collection.findIndex((item) => item.id === id);
       collection[index] = { ...collection[index], ...prepared };
-      if (values.newStudentId) {
-        const added = createEnrollment({ studentId: values.newStudentId, classId: id, startDate: values.enrollmentStartDate || today() });
-        if (added) notify("Turma salva e aluno matriculado.");
-        return added;
-      }
       notify("Alterações salvas.");
     } else {
       collection.unshift({ ...prepared, id: makeId(kind) });
@@ -1363,6 +1378,9 @@ function classEnrollmentFields(group) {
       <div class="field-grid">
         ${selectField("newStudentId", "Adicionar aluno", options, "")}
         ${inputField("enrollmentStartDate", "Data de entrada", today(), "date")}
+      </div>
+      <div class="row-actions">
+        <button class="soft-button" type="button" data-add-student-to-class ${occupancy.free <= 0 || options.length <= 1 ? "disabled" : ""}>Adicionar aluno</button>
       </div>
       <p class="drawer-note">${occupancy.free} vaga(s) livre(s) de ${group.capacity}.</p>
     </section>
