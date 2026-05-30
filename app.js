@@ -661,7 +661,7 @@ function therapistRow(name) {
       </div>
       <div class="row-actions">
         ${repasse ? financePill(repasse.status) : `<span class="pill neutral">Sem repasse</span>`}
-        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-archive="finance:${repasse.id}">Cancelar</button>` : `<button class="soft-button" data-open="therapist:${encodeURIComponent(name)}">Adicionar repasse</button>`}
+        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-delete-finance="${repasse.id}">Excluir</button>` : `<button class="soft-button" data-open="therapist:${encodeURIComponent(name)}">Adicionar repasse</button>`}
       </div>
     </div>
   `;
@@ -677,7 +677,7 @@ function financeRow(item) {
       <div class="row-actions">
         ${financePill(item.status)}
         <button class="soft-button" data-open="finance:${item.id}">Ver/Editar</button>
-        <button class="danger-button" data-archive="finance:${item.id}">Cancelar</button>
+        <button class="danger-button" data-delete-finance="${item.id}">Excluir</button>
       </div>
     </div>
   `;
@@ -746,6 +746,7 @@ function bindActions() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.go)));
   document.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openByToken(button.dataset.open)));
   document.querySelectorAll("[data-archive]").forEach((button) => button.addEventListener("click", () => archiveByToken(button.dataset.archive)));
+  document.querySelectorAll("[data-delete-finance]").forEach((button) => button.addEventListener("click", () => deleteFinance(button.dataset.deleteFinance)));
   document.querySelectorAll("[data-delete-cost]").forEach((button) => button.addEventListener("click", () => deleteCost(button.dataset.deleteCost)));
   document.querySelectorAll("[data-convert]").forEach((button) => button.addEventListener("click", () => convertWaitlist(button.dataset.convert)));
 }
@@ -1030,6 +1031,18 @@ function deleteCost(id) {
   state.finance = state.finance.filter((entry) => entry.id !== id);
   saveState();
   notify("Custo excluído.");
+  render();
+}
+
+function deleteFinance(id) {
+  const item = state.finance.find((entry) => entry.id === id);
+  if (!item) {
+    notify("Lançamento não encontrado.");
+    return;
+  }
+  state.finance = state.finance.filter((entry) => entry.id !== id);
+  saveState();
+  notify("Lançamento excluído.");
   render();
 }
 
