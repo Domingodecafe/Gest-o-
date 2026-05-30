@@ -1,10 +1,11 @@
 const STORAGE_KEY = "lado-a-socios-v2";
+const planPrices = { basico: 1199, completo: 2160 };
 const centers = ["Operação", "Terapeutas", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
 
 const seed = {
   plans: [
-    { id: "basico", name: "Básico", monthly: 680 },
-    { id: "completo", name: "Completo", monthly: 980 }
+    { id: "basico", name: "Básico", monthly: 1199 },
+    { id: "completo", name: "Completo", monthly: 2160 }
   ],
   students: [
     { id: "ana", name: "Ana Luiza", birthDate: "2012-08-14", guardian: "Mariana", phone: "(11) 99911-0001", planId: "completo", status: "Ativo", notes: "Prefere horário da manhã." },
@@ -88,7 +89,7 @@ function loadState() {
 
 function normalizeState(data) {
   const normalized = normalizeStrings(structuredClone(data));
-  normalized.plans = normalized.plans.map((plan) => ({ ...plan, name: displayText(plan.name) }));
+  normalized.plans = normalized.plans.map((plan) => ({ ...plan, name: displayText(plan.name), monthly: planPrices[plan.id] || Number(plan.monthly || 0) }));
   normalized.classes = normalized.classes.map((item) => ({
     ...item,
     weekday: displayText(item.weekday),
@@ -112,7 +113,16 @@ function normalizeState(data) {
     status: displayText(item.status),
     ...normalizeFinanceRelation(item)
   }));
+  normalized.finance = normalized.finance.map((item) => normalizeTuitionAmount(item, normalized));
   return normalized;
+}
+
+function normalizeTuitionAmount(item, normalizedState = state) {
+  if (item.type !== "Mensalidade" || item.relatedType !== "Aluno") return item;
+  const student = normalizedState.students.find((entry) => entry.id === item.relatedId);
+  const plan = student ? normalizedState.plans.find((entry) => entry.id === student.planId) : null;
+  if (!plan) return item;
+  return { ...item, description: student.name, amount: Number(plan.monthly || item.amount || 0) };
 }
 
 function normalizeStrings(value) {
@@ -827,6 +837,7 @@ function bindDrawerForm(kind, id) {
       });
     }
   }
+  if (kind === "finance") bindTuitionFinanceForm();
   drawerEl.querySelector("#drawerForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target).entries());
@@ -836,6 +847,27 @@ function bindDrawerForm(kind, id) {
       render();
     }
   });
+}
+
+function bindTuitionFinanceForm() {
+  const birthDateInput = drawerEl.querySelector('input[name="studentBirthDate"]');
+  const ageInput = drawerEl.querySelector('input[name="studentAge"]');
+  if (birthDateInput && ageInput) {
+    birthDateInput.addEventListener("input", () => {
+      ageInput.value = ageLabel(birthDateInput.value);
+    });
+  }
+  const planSelect = drawerEl.querySelector('select[name="studentPlanId"]');
+  const planReferenceInput = drawerEl.querySelector('input[name="planReference"]');
+  const amountInput = drawerEl.querySelector('input[name="amount"]');
+  if (planSelect && planReferenceInput && amountInput) {
+    planSelect.addEventListener("change", () => {
+      const plan = planById(planSelect.value);
+      const amount = Number(plan?.monthly || 0);
+      planReferenceInput.value = currency(amount);
+      amountInput.value = amount;
+    });
+  }
 }
 
 function openEnrollmentDrawer(prefill = {}) {
@@ -890,6 +922,7 @@ function saveRecord(kind, id, values) {
   }
   if (kind === "tuition") return createTuition(values);
   if (kind === "therapist") return saveTherapist(values);
+  if (kind === "finance" && values.type === "Mensalidade" && values.relatedType === "Aluno") return saveTuitionFinance(id, values);
 
   const collection = collectionFor(kind);
   const prepared = prepareRecord(kind, id, values);
@@ -905,6 +938,23 @@ function saveRecord(kind, id, values) {
       collection.unshift({ ...prepared, id: studentId, createdAt: today() });
       syncTuitionForStudent(studentId, { forcePlanAmount: true });
       notify("Aluno criado e mensalidade adicionada ao financeiro.");
+    }
+    saveState();
+    return true;
+  }
+  if (kind === "class") {
+    if (id) {
+      const index = collection.findIndex((item) => item.id === id);
+      collection[index] = { ...collection[index], ...prepared };
+      if (values.newStudentId) {
+        const added = createEnrollment({ studentId: values.newStudentId, classId: id, startDate: values.enrollmentStartDate || today() });
+        if (added) notify("Turma salva e aluno matriculado.");
+        return added;
+      }
+      notify("Alterações salvas.");
+    } else {
+      collection.unshift({ ...prepared, id: makeId(kind) });
+      notify("Turma criada.");
     }
     saveState();
     return true;
@@ -939,6 +989,37 @@ function createEnrollment(values) {
   state.enrollments.unshift({ id: makeId("enrollment"), studentId: values.studentId, classId: values.classId, status: "Ativa", startDate: values.startDate || today() });
   saveState();
   notify("Matrícula criada.");
+  return true;
+}
+
+function saveTuitionFinance(id, values) {
+  const tuition = state.finance.find((item) => item.id === id);
+  const student = studentById(values.relatedId);
+  if (!tuition || !student) {
+    notify("Mensalidade não encontrada.");
+    return false;
+  }
+  const previousPlanId = student.planId;
+  student.name = values.studentName || student.name;
+  student.guardian = values.studentGuardian || "";
+  student.phone = values.studentPhone || "";
+  student.birthDate = values.studentBirthDate || "";
+  student.planId = values.studentPlanId || student.planId;
+
+  const plan = planById(student.planId);
+  tuition.type = "Mensalidade";
+  tuition.description = student.name;
+  tuition.amount = Number(values.amount || plan?.monthly || 0);
+  tuition.date = values.date || billingDateForStudent(student, values.competence || currentCompetence());
+  tuition.status = values.status || "Pendente";
+  tuition.center = "Operação";
+  tuition.relatedType = "Aluno";
+  tuition.relatedId = student.id;
+  tuition.competence = values.competence || currentCompetence();
+  if (previousPlanId !== student.planId && !values.amount) tuition.amount = Number(plan?.monthly || 0);
+
+  saveState();
+  notify("Aluno e mensalidade atualizados.");
   return true;
 }
 
@@ -1158,6 +1239,7 @@ function fieldsFor(kind, record) {
         ${inputField("capacity", "Capacidade", record.capacity, "number")}
       </div>
       ${selectField("status", "Status", ["Ativa", "Em formação", "Encerrada"], record.status)}
+      ${record.id ? classEnrollmentFields(record) : ""}
     `;
   }
   if (kind === "wait") {
@@ -1265,41 +1347,62 @@ function defaultsFor(kind) {
   return {};
 }
 
+function classEnrollmentFields(group) {
+  const occupancy = classOccupancy(group);
+  const students = enrollmentsForClass(group.id).map((item) => studentById(item.studentId)).filter(Boolean);
+  const options = [["", occupancy.free > 0 ? "Selecione um aluno" : "Turma sem vaga"]];
+  if (occupancy.free > 0) {
+    state.students
+      .filter((student) => student.status === "Ativo" && !students.some((item) => item.id === student.id))
+      .forEach((student) => options.push([student.id, student.name]));
+  }
+  return `
+    <section class="drawer-section">
+      <h3>Alunos da turma</h3>
+      <p class="drawer-note">Matriculados: ${students.map((student) => student.name).join(", ") || "Nenhum aluno"}.</p>
+      <div class="field-grid">
+        ${selectField("newStudentId", "Adicionar aluno", options, "")}
+        ${inputField("enrollmentStartDate", "Data de entrada", today(), "date")}
+      </div>
+      <p class="drawer-note">${occupancy.free} vaga(s) livre(s) de ${group.capacity}.</p>
+    </section>
+  `;
+}
+
 function tuitionFinanceFields(record) {
   const student = studentById(record.relatedId);
   const plan = student ? planById(student.planId) : null;
   const contractDate = student ? contractDateForStudent(student.id) : "";
   return `
     ${hiddenInput("type", "Mensalidade")}
-    ${hiddenInput("description", student?.name || record.description)}
     ${hiddenInput("center", "Operação")}
     ${hiddenInput("relatedType", "Aluno")}
     ${hiddenInput("relatedId", record.relatedId)}
     <section class="drawer-section">
       <h3>Dados cadastrais</h3>
-      ${readonlyField("Nome do aluno", student?.name || record.description)}
+      ${inputField("studentName", "Nome do aluno", student?.name || record.description)}
       <div class="field-grid">
-        ${readonlyField("Responsável", student?.guardian || "Não informado")}
-        ${readonlyField("Telefone", student?.phone || "Não informado")}
+        ${inputField("studentGuardian", "Responsável", student?.guardian || "")}
+        ${inputField("studentPhone", "Telefone", student?.phone || "")}
       </div>
       <div class="field-grid">
-        ${readonlyField("Data de nascimento", student?.birthDate || "Não informada")}
-        ${readonlyField("Idade", ageLabel(student?.birthDate))}
+        ${inputField("studentBirthDate", "Data de nascimento", student?.birthDate || "", "date")}
+        ${inputField("studentAge", "Idade", ageLabel(student?.birthDate), "text", "readonly")}
       </div>
     </section>
     <section class="drawer-section">
       <h3>Pacote contratado</h3>
       <div class="field-grid">
-        ${readonlyField("Plano", plan?.name || "Não informado")}
-        ${readonlyField("Valor do plano", currency(Number(plan?.monthly || record.amount || 0)))}
+        ${selectField("studentPlanId", "Plano", state.plans.map((item) => [item.id, item.name]), student?.planId || plan?.id || "basico")}
+        ${inputField("planReference", "Valor do plano", currency(Number(plan?.monthly || record.amount || 0)), "text", "readonly")}
       </div>
       <div class="field-grid">
-        ${readonlyField("Data de contratação", contractDate || "Não informada")}
+        ${inputField("contractDate", "Data de contratação", contractDate || "", "date", "readonly")}
         ${inputField("competence", "Competência", record.competence || currentCompetence(), "month")}
       </div>
       <div class="field-grid">
         ${inputField("date", "Vencimento do mês", record.date || billingDateForStudent(student, record.competence || currentCompetence()), "date")}
-        ${inputField("amount", "Valor da mensalidade", record.amount, "number", "readonly")}
+        ${inputField("amount", "Valor da mensalidade", record.amount || plan?.monthly || 0, "number")}
       </div>
       ${selectField("status", "Status deste mês", ["Pendente", "Pago", "Atrasado", "Isento", "Cancelado"], record.status)}
       <p class="drawer-note">A cada nova competência mensal, o app cria uma mensalidade pendente. O sócio altera manualmente o status deste mês.</p>
@@ -1321,6 +1424,10 @@ function prepareRecord(kind, id, values) {
   const numericFields = ["capacity", "participants", "amount"];
   const prepared = { ...values };
   delete prepared.age;
+  if (kind === "class") {
+    delete prepared.newStudentId;
+    delete prepared.enrollmentStartDate;
+  }
   if (kind === "cost") {
     prepared.type = "Despesa";
     prepared.relatedType = "Geral";
