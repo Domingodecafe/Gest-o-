@@ -104,7 +104,7 @@ function normalizeState(data) {
     ...item,
     weekday: displayText(item.weekday),
     status: displayText(item.status),
-    studentIds: Array.isArray(item.studentIds) ? item.studentIds : []
+    studentIds: Array.isArray(item.studentIds) ? item.studentIds.filter((studentId) => normalized.students.some((student) => student.id === studentId)) : []
   }));
   normalized.finance = normalized.finance.map((item) => ({
     ...item,
@@ -1040,7 +1040,7 @@ function addStudentToWorkshop(workshopId, studentId) {
     notify("Aluno já está inscrito nessa oficina.");
     return false;
   }
-  if (workshopFreeSlots(workshop) <= 0) {
+  if (workshopStudentFreeSlots(workshop) <= 0) {
     notify("Oficina sem vaga disponível.");
     return false;
   }
@@ -1438,7 +1438,7 @@ function classEnrollmentFields(group) {
 }
 
 function workshopStudentFields(workshop) {
-  const free = workshopFreeSlots(workshop);
+  const free = workshopStudentFreeSlots(workshop);
   const studentIds = workshopStudentIds(workshop);
   const students = studentIds.map((id) => studentById(id)).filter(Boolean);
   const options = [["", free > 0 ? "Selecione um aluno" : "Oficina sem vaga"]];
@@ -1453,7 +1453,7 @@ function workshopStudentFields(workshop) {
       <p class="drawer-note">Inscritos: ${students.map((student) => student.name).join(", ") || "Nenhum aluno vinculado"}.</p>
       <div class="field-grid">
         ${selectField("newWorkshopStudentId", "Adicionar aluno", options, "")}
-        ${readonlyField("Vagas livres", `${free} de ${workshop.capacity}`)}
+        ${readonlyField("Vagas para alunos", `${free} de ${workshop.capacity}`)}
       </div>
       <div class="row-actions">
         <button class="soft-button" type="button" data-add-student-to-workshop ${free <= 0 || options.length <= 1 ? "disabled" : ""}>Adicionar aluno</button>
@@ -1582,7 +1582,8 @@ function classOccupancy(group) {
 }
 
 function workshopStudentIds(workshop) {
-  return Array.isArray(workshop?.studentIds) ? workshop.studentIds : [];
+  if (!Array.isArray(workshop?.studentIds)) return [];
+  return workshop.studentIds.filter((studentId) => Boolean(studentById(studentId)));
 }
 
 function workshopParticipantsCount(workshop) {
@@ -1591,6 +1592,10 @@ function workshopParticipantsCount(workshop) {
 
 function workshopFreeSlots(workshop) {
   return Math.max(Number(workshop?.capacity || 0) - workshopParticipantsCount(workshop), 0);
+}
+
+function workshopStudentFreeSlots(workshop) {
+  return Math.max(Number(workshop?.capacity || 0) - workshopStudentIds(workshop).length, 0);
 }
 
 function enrollmentsForClass(classId) {
