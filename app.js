@@ -1334,10 +1334,7 @@ function fieldsFor(kind, record) {
         ${inputField("end", "Horário fim", record.end, "time")}
       </div>
       ${inputField("therapist", "Terapeuta", record.therapist)}
-      <div class="field-grid">
-        ${inputField("capacity", "Capacidade", record.capacity, "number")}
-        ${inputField("participants", "Participantes", workshopParticipantsCount(record), "number")}
-      </div>
+      ${inputField("capacity", "Capacidade", record.capacity, "number")}
       ${record.id ? workshopStudentFields(record) : ""}
     `;
   }
@@ -1514,7 +1511,7 @@ function defaultsForTherapist(name = "") {
 }
 
 function prepareRecord(kind, id, values) {
-  const numericFields = ["capacity", "participants", "amount"];
+  const numericFields = ["capacity", "amount"];
   const prepared = { ...values };
   delete prepared.age;
   if (kind === "class") {
@@ -1524,6 +1521,7 @@ function prepareRecord(kind, id, values) {
   if (kind === "workshop") {
     delete prepared.newWorkshopStudentId;
     prepared.studentIds = Array.isArray(prepared.studentIds) ? prepared.studentIds : (id ? (state.workshops.find((item) => item.id === id)?.studentIds || []) : []);
+    prepared.participants = prepared.studentIds.length;
   }
   if (kind === "cost") {
     prepared.type = "Despesa";
