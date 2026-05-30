@@ -293,7 +293,7 @@ function classCard(group) {
       <div class="card-actions">
         <button class="soft-button" data-open="class:${group.id}">Ver/Editar</button>
         <button class="soft-button" data-open="enrollment:${group.id}" ${occupancy.free <= 0 || group.status !== "Ativa" ? "disabled" : ""}>Matricular</button>
-        <button class="danger-button" data-archive="class:${group.id}">Encerrar</button>
+        <button class="danger-button" data-delete-record="class:${group.id}">Excluir</button>
       </div>
     </article>
   `;
@@ -344,7 +344,7 @@ function studentCard(student) {
       <div class="card-actions">
         <button class="soft-button" data-open="student:${student.id}">Ver/Editar</button>
         <button class="soft-button" data-open="studentEnrollment:${student.id}" ${student.status !== "Ativo" ? "disabled" : ""}>Matricular</button>
-        <button class="danger-button" data-archive="student:${student.id}">Cancelar</button>
+        <button class="danger-button" data-delete-record="student:${student.id}">Excluir</button>
       </div>
     </article>
   `;
@@ -385,7 +385,7 @@ function waitCard(item) {
       <div class="card-actions">
         <button class="soft-button" data-open="wait:${item.id}">Ver/Editar</button>
         <button class="soft-button" data-convert="${item.id}" ${item.status !== "Aguardando" ? "disabled" : ""}>Converter em aluno</button>
-        <button class="danger-button" data-archive="wait:${item.id}">Arquivar</button>
+        <button class="danger-button" data-delete-record="wait:${item.id}">Excluir</button>
       </div>
     </article>
   `;
@@ -426,7 +426,7 @@ function workshopCard(item) {
       </div>
       <div class="card-actions">
         <button class="soft-button" data-open="workshop:${item.id}">Ver/Editar</button>
-        <button class="danger-button" data-archive="workshop:${item.id}">Cancelar</button>
+        <button class="danger-button" data-delete-record="workshop:${item.id}">Excluir</button>
       </div>
     </article>
   `;
@@ -746,6 +746,7 @@ function bindActions() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.go)));
   document.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openByToken(button.dataset.open)));
   document.querySelectorAll("[data-archive]").forEach((button) => button.addEventListener("click", () => archiveByToken(button.dataset.archive)));
+  document.querySelectorAll("[data-delete-record]").forEach((button) => button.addEventListener("click", () => deleteByToken(button.dataset.deleteRecord)));
   document.querySelectorAll("[data-delete-finance]").forEach((button) => button.addEventListener("click", () => deleteFinance(button.dataset.deleteFinance)));
   document.querySelectorAll("[data-delete-cost]").forEach((button) => button.addEventListener("click", () => deleteCost(button.dataset.deleteCost)));
   document.querySelectorAll("[data-convert]").forEach((button) => button.addEventListener("click", () => convertWaitlist(button.dataset.convert)));
@@ -789,7 +790,7 @@ function drawerTemplate(kind, record, isEdit) {
       <div class="drawer-actions">
         <button class="primary-button" type="submit">Salvar alterações</button>
         <button class="ghost-button" type="button" data-close>Cancelar</button>
-        ${isEdit && kind !== "tuition" ? `<button class="danger-button" type="button" data-drawer-archive>Arquivar/Cancelar</button>` : ""}
+        ${isEdit && kind !== "tuition" ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
       </div>
     </form>
   `;
@@ -797,8 +798,8 @@ function drawerTemplate(kind, record, isEdit) {
 
 function bindDrawerForm(kind, id) {
   drawerEl.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", closeDrawer));
-  const archiveButton = drawerEl.querySelector("[data-drawer-archive]");
-  if (archiveButton) archiveButton.addEventListener("click", () => archiveRecord(kind, id));
+  const deleteButton = drawerEl.querySelector("[data-drawer-delete]");
+  if (deleteButton) deleteButton.addEventListener("click", () => deleteRecord(kind, id));
   if (kind === "student") {
     const birthDateInput = drawerEl.querySelector('input[name="birthDate"]');
     const ageInput = drawerEl.querySelector('input[name="age"]');
@@ -1002,6 +1003,11 @@ function archiveByToken(token) {
   archiveRecord(kind, id);
 }
 
+function deleteByToken(token) {
+  const [kind, id] = token.split(":");
+  deleteRecord(kind, id);
+}
+
 function archiveRecord(kind, id) {
   if (!id) return;
   if (kind === "student") {
@@ -1018,6 +1024,47 @@ function archiveRecord(kind, id) {
   if (kind === "cost") updateById(state.finance, id, { status: "Cancelado" });
   saveState();
   notify("Registro arquivado/cancelado.");
+  closeDrawer();
+  render();
+}
+
+function deleteRecord(kind, id) {
+  if (!id) return;
+  if (kind === "student") {
+    const student = state.students.find((item) => item.id === id);
+    if (!student) return notify("Aluno nÃ£o encontrado.");
+    state.students = state.students.filter((item) => item.id !== id);
+    state.enrollments = state.enrollments.filter((item) => item.studentId !== id);
+    state.finance = state.finance.filter((item) => !(item.relatedType === "Aluno" && item.relatedId === id));
+    notify("Aluno excluÃ­do.");
+  } else if (kind === "class") {
+    const group = state.classes.find((item) => item.id === id);
+    if (!group) return notify("Turma nÃ£o encontrada.");
+    state.classes = state.classes.filter((item) => item.id !== id);
+    state.enrollments = state.enrollments.filter((item) => item.classId !== id);
+    state.finance = state.finance.filter((item) => !(item.relatedType === "Turma" && item.relatedId === id));
+    notify("Turma excluÃ­da.");
+  } else if (kind === "wait") {
+    const lead = state.waitlist.find((item) => item.id === id);
+    if (!lead) return notify("Interessado nÃ£o encontrado.");
+    state.waitlist = state.waitlist.filter((item) => item.id !== id);
+    notify("Interessado excluÃ­do.");
+  } else if (kind === "workshop") {
+    const workshop = state.workshops.find((item) => item.id === id);
+    if (!workshop) return notify("Oficina nÃ£o encontrada.");
+    state.workshops = state.workshops.filter((item) => item.id !== id);
+    state.finance = state.finance.filter((item) => !(item.relatedType === "Oficina" && item.relatedId === id));
+    notify("Oficina excluÃ­da.");
+  } else if (kind === "therapist") {
+    const before = state.finance.length;
+    state.finance = state.finance.filter((item) => !(item.relatedType === "Terapeuta" && item.relatedId === id));
+    if (state.finance.length === before) return notify("Repasse nÃ£o encontrado.");
+    notify("Repasse excluÃ­do.");
+  } else if (kind === "finance" || kind === "cost") {
+    deleteFinance(id);
+    return;
+  }
+  saveState();
   closeDrawer();
   render();
 }
