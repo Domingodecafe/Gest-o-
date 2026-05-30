@@ -645,7 +645,7 @@ function costRow(item) {
       <div class="row-actions">
         ${financePill(item.status)}
         <button class="soft-button" data-open="cost:${item.id}">Ver/Editar</button>
-        <button class="danger-button" data-archive="finance:${item.id}">Cancelar</button>
+        <button class="danger-button" data-delete-cost="${item.id}">Excluir</button>
       </div>
     </div>
   `;
@@ -746,6 +746,7 @@ function bindActions() {
   document.querySelectorAll("[data-go]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.go)));
   document.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openByToken(button.dataset.open)));
   document.querySelectorAll("[data-archive]").forEach((button) => button.addEventListener("click", () => archiveByToken(button.dataset.archive)));
+  document.querySelectorAll("[data-delete-cost]").forEach((button) => button.addEventListener("click", () => deleteCost(button.dataset.deleteCost)));
   document.querySelectorAll("[data-convert]").forEach((button) => button.addEventListener("click", () => convertWaitlist(button.dataset.convert)));
 }
 
@@ -1017,6 +1018,18 @@ function archiveRecord(kind, id) {
   saveState();
   notify("Registro arquivado/cancelado.");
   closeDrawer();
+  render();
+}
+
+function deleteCost(id) {
+  const item = state.finance.find((entry) => entry.id === id && entry.type === "Despesa" && entry.center !== "Terapeutas");
+  if (!item) {
+    notify("Custo não encontrado.");
+    return;
+  }
+  state.finance = state.finance.filter((entry) => entry.id !== id);
+  saveState();
+  notify("Custo excluído.");
   render();
 }
 
