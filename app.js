@@ -443,7 +443,6 @@ function renderFinance() {
             <p>Mensalidades, repasses e custos separados para leitura rápida.</p>
           </div>
           <div class="row-actions">
-            <button class="soft-button" data-open="finance:tuition">Gerar mensalidade</button>
             <button class="primary-button" data-open="finance:new">Novo lançamento</button>
           </div>
         </div>
