@@ -7,7 +7,28 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell" id="appShell">
+    <section class="login-screen" id="loginScreen" hidden>
+      <form class="login-card" id="loginForm">
+        <div class="brand login-brand">
+          <span class="brand-mark">LA</span>
+          <div>
+            <strong>LADO A</strong>
+            <small>Gestão dos sócios</small>
+          </div>
+        </div>
+        <div>
+          <h1>Acesso dos sócios</h1>
+          <p>Digite a senha para abrir o painel da unidade.</p>
+        </div>
+        <label>Senha
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-button" type="submit">Entrar</button>
+        <p class="login-error" id="loginError" hidden>Senha inválida. Confira e tente novamente.</p>
+      </form>
+    </section>
+
+    <main class="app-shell" id="appShell" hidden>
       <aside class="sidebar">
         <div class="brand">
           <span class="brand-mark">LA</span>
@@ -40,26 +61,62 @@
       </section>
     </main>
 
+    <div class="sync-status" id="syncStatus" aria-live="polite">Carregando...</div>
     <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
     <aside class="drawer" id="drawer" aria-label="Ficha lateral" aria-hidden="true"></aside>
     <div class="toast" id="toast" hidden></div>
     <script type="module">
       const STORAGE_KEY = "lado-a-socios-v2";
       const STATE_API_URL = "https://acpfzhdswmwyaurhixxt.supabase.co/functions/v1/lado-a-state";
-      const STATE_API_PASSWORD = "ladoAlondrina";
-      const APP_VERSION = "therapist-visible-total-20260530";
+      const ACCESS_KEY = "lado-a-access-password";
+      const APP_VERSION = "daily-panel-mobile-tables-20260531";
+      const OFFLINE_MODE = new URLSearchParams(window.location.search).has("offline") || window.location.port === "5174";
+      const appShell = document.querySelector("#appShell");
+      const loginScreen = document.querySelector("#loginScreen");
+      const loginForm = document.querySelector("#loginForm");
+      const loginPassword = document.querySelector("#loginPassword");
+      const loginError = document.querySelector("#loginError");
+      const syncStatus = document.querySelector("#syncStatus");
       const originalSetItem = localStorage.setItem.bind(localStorage);
+      let stateApiPassword = sessionStorage.getItem(ACCESS_KEY) || "";
       let saveTimer = null;
+
+      function setSyncStatus(text, mode) {
+        if (!syncStatus) return;
+        syncStatus.textContent = text;
+        syncStatus.dataset.mode = mode;
+      }
 
       function setOnlineStatus(online) {
         window.__ladoAOnline = online;
+        setSyncStatus(online ? "Salvo online" : (OFFLINE_MODE ? "Modo teste local" : "Modo local"));
         window.dispatchEvent(new CustomEvent("lado-a-online-change", { detail: { online } }));
       }
 
+      function showApp() {
+        if (loginScreen) loginScreen.hidden = true;
+        if (appShell) appShell.hidden = false;
+      }
+
+      function showLogin() {
+        if (appShell) appShell.hidden = true;
+        if (loginScreen) loginScreen.hidden = false;
+        window.setTimeout(() => loginPassword?.focus(), 50);
+      }
+
       async function loadOnlineData() {
+        if (OFFLINE_MODE) {
+          setOnlineStatus(false);
+          return true;
+        }
+        if (!stateApiPassword) {
+          setOnlineStatus(false);
+          return false;
+        }
         try {
+          setSyncStatus("Carregando dados...", "pending");
           const response = await fetch(STATE_API_URL, {
-            headers: { "x-lado-a-password": STATE_API_PASSWORD }
+            headers: { "x-lado-a-password": stateApiPassword }
           });
           if (!response.ok) throw new Error(`Supabase ${response.status}`);
           const payload = await response.json();
@@ -67,18 +124,25 @@
             originalSetItem(STORAGE_KEY, JSON.stringify(payload.data));
           }
           setOnlineStatus(true);
+          return true;
         } catch {
           setOnlineStatus(false);
+          return false;
         }
       }
 
       async function saveOnlineData(value) {
+        if (OFFLINE_MODE) {
+          setOnlineStatus(false);
+          return;
+        }
         try {
+          setSyncStatus("Salvando...", "pending");
           const response = await fetch(STATE_API_URL, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-lado-a-password": STATE_API_PASSWORD
+              "x-lado-a-password": stateApiPassword
             },
             body: JSON.stringify({ data: JSON.parse(value) })
           });
@@ -89,15 +153,41 @@
         }
       }
 
+      async function waitForPassword() {
+        showLogin();
+        return new Promise((resolve) => {
+          loginForm?.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            stateApiPassword = loginPassword?.value || "";
+            if (loginError) loginError.hidden = true;
+            const ok = await loadOnlineData();
+            if (!ok) {
+              sessionStorage.removeItem(ACCESS_KEY);
+              if (loginError) loginError.hidden = false;
+              loginPassword?.select();
+              return;
+            }
+            sessionStorage.setItem(ACCESS_KEY, stateApiPassword);
+            showApp();
+            resolve(true);
+          });
+        });
+      }
+
       localStorage.setItem = function patchedSetItem(key, value) {
         originalSetItem(key, value);
-        if (key === STORAGE_KEY) {
+        if (key === STORAGE_KEY && !OFFLINE_MODE) {
           window.clearTimeout(saveTimer);
           saveTimer = window.setTimeout(() => saveOnlineData(value), 500);
         }
       };
 
-      await loadOnlineData();
+      const loaded = await loadOnlineData();
+      if (OFFLINE_MODE || loaded) {
+        showApp();
+      } else {
+        await waitForPassword();
+      }
       await import(`./app.js?v=${APP_VERSION}`);
     </script>
   </body>

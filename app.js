@@ -216,6 +216,7 @@ function renderSummary() {
     ["Alunos ativos", data.activeStudents, "alunos"],
     ["Vagas livres", data.freeSlots, "turmas"],
     ["Ocupação", `${data.occupancyRate.toFixed(0)}%`, "turmas"],
+    ["Mensalidades pendentes", data.overdue, "financeiro"],
     ["Fila de espera", data.waiting, "espera"]
   ];
   summaryEl.innerHTML = cards.map(([label, value, target]) => `<button class="summary-card" data-go="${target}"><span>${label}</span><strong>${value}</strong></button>`).join("");
@@ -241,19 +242,168 @@ function renderWorkshopSummary(data) {
 
 function renderDashboard() {
   titleEl.textContent = "Painel";
+  const finance = financeSummary();
   viewEl.innerHTML = `
+    <div class="screen-grid">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Painel diário</h2>
+            <p>Atividades próximas, pendências e atalhos para a rotina dos sócios.</p>
+          </div>
+          <div class="row-actions">
+            <button class="primary-button" data-open="student:new">Novo aluno</button>
+            <button class="soft-button" data-open="class:new">Nova turma</button>
+          </div>
+        </div>
+        <div class="stack">
+          <article class="record-card">
+            <header>
+              <div>
+                <h3>Hoje e próximos dias</h3>
+                <p class="subtle">Turmas e oficinas programadas para acompanhamento rápido.</p>
+              </div>
+              <span class="tag blue">${upcomingActivities().length} atividade(s)</span>
+            </header>
+            <div class="stack">
+              ${upcomingActivities().length ? upcomingActivities().map(activityRow).join("") : `<p class="empty">Nenhuma turma ou oficina programada.</p>`}
+            </div>
+          </article>
+          <article class="record-card">
+            <header>
+              <div>
+                <h3>Pendências que pedem atenção</h3>
+                <p class="subtle">Mensalidades em aberto e interessados aguardando vaga.</p>
+              </div>
+            </header>
+            <div class="records-grid compact-grid">
+              ${dashboardPendingTuition()}
+              ${dashboardWaitlist()}
+            </div>
+          </article>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Resumo financeiro</h2>
+            <p>Resultado do mês atual por competência.</p>
+          </div>
+        </div>
+        <div class="stack">
+          ${financeResultCard("Entradas recebidas", finance.receivedRevenue)}
+          ${financeResultCard("Entradas previstas", finance.expectedRevenue)}
+          ${financeResultCard("Total de custos", finance.totalCosts)}
+          ${financeResultCard("Lucro previsto", finance.expectedProfit)}
+        </div>
+        <div class="quick-actions">
+          <button class="primary-button" data-go="financeiro">Abrir financeiro</button>
+          <button class="soft-button" data-open="cost:new">Adicionar custo</button>
+          <button class="soft-button" data-open="workshop:new">Nova oficina</button>
+        </div>
+      </aside>
+    </div>
     <section class="panel">
         <div class="section-head">
           <div>
-            <h2>Operação da unidade</h2>
-            <p>Resumo para decisões dos sócios, sem rotina de recepção ou chamada.</p>
+            <h2>Alertas da unidade</h2>
+            <p>Resumo para decisões rápidas dos sócios.</p>
           </div>
-          <button class="primary-button" data-open="class:new">Nova turma</button>
         </div>
         <div class="records-grid">
           ${decisionCards().join("")}
         </div>
       </section>
+  `;
+}
+
+function upcomingActivities() {
+  const activities = [];
+  state.classes
+    .filter((item) => ["Ativa", "Em formação"].includes(item.status))
+    .forEach((group) => {
+      activities.push({
+        kind: "Turma",
+        name: group.name,
+        date: nextWeekdayDate(group.weekday),
+        start: group.start,
+        end: group.end,
+        therapist: group.therapist,
+        room: group.room,
+        capacity: group.capacity,
+        count: classOccupancy(group).occupied,
+        target: `class:${group.id}`
+      });
+    });
+  state.workshops
+    .filter((item) => !["Cancelada", "Encerrada"].includes(item.status))
+    .forEach((workshop) => {
+      activities.push({
+        kind: "Oficina",
+        name: workshop.name,
+        date: workshop.type === "Recorrente" ? nextWeekdayDate(workshop.weekday) : (workshop.date || today()),
+        start: workshop.start,
+        end: workshop.end,
+        therapist: workshop.therapist,
+        room: "",
+        capacity: workshop.capacity,
+        count: workshopParticipantsCount(workshop),
+        target: `workshop:${workshop.id}`
+      });
+    });
+  return activities
+    .sort((a, b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`))
+    .slice(0, 6);
+}
+
+function activityRow(item) {
+  return `
+    <div class="data-row">
+      <div>
+        <h3>${item.name}</h3>
+        <p class="subtle">${item.kind} | ${friendlyDate(item.date)} | ${item.start}-${item.end} | ${item.therapist || "Sem terapeuta"}${item.room ? ` | ${item.room}` : ""}</p>
+      </div>
+      <div class="row-actions">
+        <span class="tag blue">${item.count}/${item.capacity}</span>
+        <button class="soft-button" data-open="${item.target}">Ver/Editar</button>
+      </div>
+    </div>
+  `;
+}
+
+function dashboardPendingTuition() {
+  const rows = currentTuitionRows().filter((item) => ["Pendente", "Atrasado"].includes(item.status)).slice(0, 4);
+  return `
+    <article class="decision-card">
+      <header>
+        <div>
+          <h3>Mensalidades pendentes</h3>
+          <p class="subtle">${rows.length ? `${rows.length} aluno(s) para revisar.` : "Tudo certo no mês atual."}</p>
+        </div>
+        <span class="tag ${rows.length ? "yellow" : "green"}">${rows.length}</span>
+      </header>
+      <div class="inline-list">
+        ${rows.length ? rows.map((item) => `<button class="soft-button" data-open="finance:${item.id}">${item.description}</button>`).join("") : `<span class="pill paid">Sem pendência</span>`}
+      </div>
+    </article>
+  `;
+}
+
+function dashboardWaitlist() {
+  const rows = state.waitlist.filter((item) => item.status === "Aguardando").slice(0, 4);
+  return `
+    <article class="decision-card">
+      <header>
+        <div>
+          <h3>Fila de espera</h3>
+          <p class="subtle">${rows.length ? "Interessados aguardando contato ou vaga." : "Nenhum interessado aguardando."}</p>
+        </div>
+        <span class="tag ${rows.length ? "blue" : "green"}">${rows.length}</span>
+      </header>
+      <div class="inline-list">
+        ${rows.length ? rows.map((item) => `<button class="soft-button" data-open="wait:${item.id}">${item.name}</button>`).join("") : `<span class="pill paid">Fila limpa</span>`}
+      </div>
+    </article>
   `;
 }
 
@@ -660,8 +810,9 @@ function costList(title, rows) {
 }
 
 function costKind(item) {
-  if (item.costType === "Fixo") return "fixo";
-  if (item.costType === "Variável") return "variavel";
+  const kind = displayText(item.costType || "").toLowerCase();
+  if (kind === "fixo") return "fixo";
+  if (kind === "variável" || kind === "variavel") return "variavel";
   return ["Estrutura", "Administrativo"].includes(item.center) ? "fixo" : "variavel";
 }
 
@@ -1131,10 +1282,12 @@ function saveTherapist(values) {
   }
   workshop.therapist = name;
   const amount = Number(values.amount || 0);
+  const status = values.status || "Pendente";
   const existing = financeForTherapist(name);
   if (amount > 0 && existing) {
     existing.amount = amount;
     existing.description = `Repasse ${name}`;
+    existing.status = status;
     existing.relatedType = "Terapeuta";
     existing.relatedId = name;
     existing.center = "Terapeutas";
@@ -1145,7 +1298,7 @@ function saveTherapist(values) {
       description: `Repasse ${name}`,
       amount,
       date: today(),
-      status: "Pendente",
+      status,
       center: "Terapeutas",
       relatedType: "Terapeuta",
       relatedId: name
@@ -1393,7 +1546,10 @@ function fieldsFor(kind, record) {
     return `
       ${inputField("name", "Nome do terapeuta", record.name)}
       ${selectField("workshopId", "Oficina assumida", state.workshops.map((item) => [item.id, `${item.name} - ${item.start}/${item.end}`]), record.workshopId)}
-      ${inputField("amount", "Valor do repasse", record.amount, "number")}
+      <div class="field-grid">
+        ${inputField("amount", "Valor do repasse", record.amount, "number")}
+        ${selectField("status", "Status do repasse", ["Pendente", "Pago", "Atrasado", "Cancelado"], record.status || "Pendente")}
+      </div>
     `;
   }
   return "";
@@ -1513,7 +1669,8 @@ function defaultsForTherapist(name = "") {
   return {
     name,
     workshopId: existingWorkshop?.id || state.workshops[0]?.id || "",
-    amount: repasse?.amount || 0
+    amount: repasse?.amount || 0,
+    status: repasse?.status || "Pendente"
   };
 }
 
@@ -1534,6 +1691,7 @@ function prepareRecord(kind, id, values) {
     prepared.type = "Despesa";
     prepared.relatedType = "Geral";
     prepared.relatedId = "";
+    prepared.costType = costKind(prepared) === "fixo" ? "Fixo" : "Variável";
   }
   numericFields.forEach((field) => {
     if (field in prepared) prepared[field] = Number(prepared[field] || 0);
@@ -1708,6 +1866,33 @@ function makeId(prefix) {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function nextWeekdayDate(weekday) {
+  const days = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  const target = days.indexOf(normalizeKey(weekday));
+  if (target < 0) return today();
+  const base = new Date(`${today()}T12:00:00`);
+  const delta = (target - base.getDay() + 7) % 7;
+  base.setDate(base.getDate() + delta);
+  return base.toISOString().slice(0, 10);
+}
+
+function friendlyDate(dateValue) {
+  const value = String(dateValue || today()).slice(0, 10);
+  const base = new Date(`${today()}T12:00:00`);
+  const target = new Date(`${value}T12:00:00`);
+  const diff = Math.round((target - base) / 86400000);
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Amanhã";
+  return target.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function normalizeKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function currentCompetence() {
