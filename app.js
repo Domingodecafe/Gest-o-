@@ -842,7 +842,8 @@ function therapistRow(name) {
       </div>
       <div class="row-actions">
         ${repasse ? financePill(repasse.status) : `<span class="pill neutral">Sem repasse</span>`}
-        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-delete-finance="${repasse.id}">Excluir</button>` : `<button class="soft-button" data-open="therapist:${encodeURIComponent(name)}">Adicionar repasse</button>`}
+        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-delete-finance="${repasse.id}">Limpar repasse</button>` : `<button class="soft-button" data-open="therapist:${encodeURIComponent(name)}">Adicionar repasse</button>`}
+        <button class="danger-button" data-delete-therapist="${escapeHtml(name)}">Excluir terapeuta</button>
       </div>
     </div>
   `;
@@ -942,6 +943,7 @@ function bindActions() {
   document.querySelectorAll("[data-delete-record]").forEach((button) => button.addEventListener("click", () => deleteByToken(button.dataset.deleteRecord)));
   document.querySelectorAll("[data-delete-finance]").forEach((button) => button.addEventListener("click", () => deleteFinance(button.dataset.deleteFinance)));
   document.querySelectorAll("[data-delete-cost]").forEach((button) => button.addEventListener("click", () => deleteCost(button.dataset.deleteCost)));
+  document.querySelectorAll("[data-delete-therapist]").forEach((button) => button.addEventListener("click", () => deleteTherapist(button.dataset.deleteTherapist)));
   document.querySelectorAll("[data-convert]").forEach((button) => button.addEventListener("click", () => convertWaitlist(button.dataset.convert)));
 }
 
@@ -1418,6 +1420,28 @@ function deleteFinance(id) {
   state.finance = state.finance.filter((entry) => entry.id !== id);
   saveState();
   notify("Lançamento excluído.");
+  render();
+}
+
+function deleteTherapist(name) {
+  if (!name) return;
+  let changed = false;
+  state.finance = state.finance.filter((item) => {
+    const keep = !(item.type === "Despesa" && item.center === "Terapeutas" && therapistNameForFinance(item) === name);
+    if (!keep) changed = true;
+    return keep;
+  });
+  state.workshops = state.workshops.map((workshop) => {
+    if (workshop.therapist !== name) return workshop;
+    changed = true;
+    return { ...workshop, therapist: "" };
+  });
+  if (!changed) {
+    notify("Terapeuta não encontrado.");
+    return;
+  }
+  saveState();
+  notify("Terapeuta excluído.");
   render();
 }
 
