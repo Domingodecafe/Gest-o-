@@ -1,6 +1,8 @@
 const STORAGE_KEY = "lado-a-socios-v2";
 const planPrices = { basico: 1199, completo: 2160 };
-const centers = ["Operação", "Terapeutas", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
+const centers = ["Operação", "Equipe", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
+const defaultHourlyRates = { terapeuta: 80, estagiario: 30 };
+const staffCategories = ["Terapeuta", "Estagiário"];
 
 const seed = {
   plans: [
@@ -34,6 +36,11 @@ const seed = {
     { id: "of-arte", name: "Oficina de Arte", type: "Avulsa", date: "2026-06-08", weekday: "", start: "11:00", end: "12:00", therapist: "Livia", capacity: 8, participants: 5, status: "Aberta" },
     { id: "of-social", name: "Habilidades Sociais", type: "Recorrente", date: "", weekday: "Sexta", start: "17:00", end: "18:00", therapist: "Renata", capacity: 10, participants: 4, status: "Planejada" }
   ],
+  staff: [],
+  assignments: [],
+  settings: {
+    hourlyRates: { ...defaultHourlyRates }
+  },
   finance: [
     { id: "fin-1", type: "Mensalidade", description: "Ana Luiza", amount: 980, date: "2026-05-05", status: "Pago", center: "Operação", relatedType: "Aluno", relatedId: "ana" },
     { id: "fin-2", type: "Mensalidade", description: "Bruno Martins", amount: 680, date: "2026-05-05", status: "Atrasado", center: "Operação", relatedType: "Aluno", relatedId: "bruno" },
@@ -106,6 +113,23 @@ function normalizeState(data) {
     status: displayText(item.status),
     studentIds: Array.isArray(item.studentIds) ? item.studentIds.filter((studentId) => normalized.students.some((student) => student.id === studentId)) : []
   }));
+  normalized.staff = Array.isArray(normalized.staff) ? normalized.staff.map((item) => ({
+    ...item,
+    category: staffCategories.includes(displayText(item.category)) ? displayText(item.category) : "Terapeuta",
+    status: ["Ativo", "Inativo"].includes(displayText(item.status)) ? displayText(item.status) : "Ativo",
+    hourlyRate: item.hourlyRate === "" || item.hourlyRate === null || item.hourlyRate === undefined ? "" : Number(item.hourlyRate || 0)
+  })).filter((item) => !String(item.name || "").startsWith("staff-")) : [];
+  normalized.staff = uniqueStaff(normalized.staff);
+  normalized.assignments = Array.isArray(normalized.assignments) ? normalized.assignments
+    .filter((item) => item && item.staffId && item.activityId && ["class", "workshop"].includes(item.activityType))
+    .map((item) => ({ ...item, hours: Number(item.hours || 0) })) : [];
+  normalized.settings = {
+    ...(normalized.settings || {}),
+    hourlyRates: {
+      terapeuta: Number(normalized.settings?.hourlyRates?.terapeuta || defaultHourlyRates.terapeuta),
+      estagiario: Number(normalized.settings?.hourlyRates?.estagiario || defaultHourlyRates.estagiario)
+    }
+  };
   normalized.finance = normalized.finance.map((item) => ({
     ...item,
     description: cleanFinanceDescription(item.description),
@@ -115,6 +139,10 @@ function normalizeState(data) {
     ...normalizeFinanceRelation(item)
   }));
   normalized.finance = normalized.finance.map((item) => normalizeTuitionAmount(item, normalized));
+  const staffIds = new Set(normalized.staff.map((member) => member.id));
+  normalized.finance = normalized.finance.filter((item) => !(item.type === "Despesa" && displayText(item.center) === "Equipe" && String(item.relatedId || "").startsWith("staff-") && !staffIds.has(item.relatedId)));
+  migrateLegacyTeam(normalized);
+  syncTeamPayroll(normalized, { preserveStatus: true });
   return normalized;
 }
 
@@ -158,14 +186,113 @@ function repairText(value) {
 }
 
 function normalizeFinanceRelation(item) {
-  if (displayText(item.center) === "Terapeutas" && item.type === "Despesa" && (!item.relatedId || item.relatedType === "Geral")) {
-    return { relatedType: "Terapeuta", relatedId: "Livia", description: item.description === "Repasse terapeutas" ? "Repasse Livia" : item.description };
+  if (displayText(item.center) === "Terapeutas" && item.type === "Despesa") {
+    const legacyName = item.relatedId || String(item.description || "").replace(/^Repasse\s+/i, "").trim();
+    return { center: "Equipe", relatedType: "Equipe", relatedId: legacyName || "Livia", description: item.description === "Repasse terapeutas" ? "Repasse Livia" : item.description };
+  }
+  if (displayText(item.center) === "Equipe" && item.type === "Despesa" && item.relatedType === "Terapeuta") {
+    return { relatedType: "Equipe" };
   }
   return {};
 }
 
 function cleanFinanceDescription(description) {
   return String(description || "").replace(/\s+-\s+(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i, "");
+}
+
+function migrateLegacyTeam(data) {
+  const names = [];
+  data.classes.forEach((item) => {
+    if (item.therapist) names.push(item.therapist);
+  });
+  data.workshops.forEach((item) => {
+    if (item.therapist) names.push(item.therapist);
+  });
+  data.finance.forEach((item) => {
+    if (item.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center))) {
+      const name = legacyStaffNameForFinance(item);
+      if (name) names.push(name);
+    }
+  });
+
+  [...new Set(names.map((name) => displayText(name).trim()).filter(Boolean))].forEach((name) => {
+    const staffId = staffIdFromName(name);
+    if (!data.staff.some((item) => item.id === staffId || item.name === name)) {
+      data.staff.push({ id: staffIdFromName(name), name, category: "Terapeuta", phone: "", hourlyRate: "", status: "Ativo", notes: "" });
+    }
+  });
+
+  data.classes.forEach((item) => {
+    if (item.therapist) ensureLegacyAssignment(data, "class", item.id, item.therapist, durationHours(item.start, item.end));
+  });
+  data.workshops.forEach((item) => {
+    if (item.therapist) ensureLegacyAssignment(data, "workshop", item.id, item.therapist, durationHours(item.start, item.end));
+  });
+}
+
+function ensureLegacyAssignment(data, activityType, activityId, staffName, hours) {
+  const cleanName = displayText(staffName).trim();
+  const staff = data.staff.find((item) => item.id === staffIdFromName(cleanName) || item.name === cleanName);
+  if (!staff) return;
+  const exists = data.assignments.some((item) => item.activityType === activityType && item.activityId === activityId && item.staffId === staff.id);
+  if (!exists) {
+    data.assignments.push({ id: `${activityType}-${activityId}-${staff.id}`, activityType, activityId, staffId: staff.id, hours: Number(hours || 0) });
+  }
+}
+
+function legacyStaffNameForFinance(item) {
+  if (item.relatedType === "Equipe" && String(item.relatedId || "").startsWith("staff-")) return "";
+  if (item.relatedId) return displayText(item.relatedId);
+  const inferred = String(item.description || "").replace(/^Repasse\s+/i, "").trim();
+  return inferred && normalizeKey(inferred) !== "terapeutas" ? displayText(inferred) : "";
+}
+
+function staffIdFromName(name) {
+  const key = normalizeKey(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "equipe";
+  return `staff-${key}`;
+}
+
+function uniqueStaff(staffRows) {
+  const byId = new Map();
+  staffRows.forEach((member) => {
+    const cleanName = String(member.name || "").trim();
+    const id = member.id || staffIdFromName(cleanName);
+    const current = byId.get(id);
+    byId.set(id, current ? { ...current, ...member, id, name: cleanName } : { ...member, id, name: cleanName });
+  });
+  return [...byId.values()];
+}
+
+function syncTeamPayroll(data = state, options = {}) {
+  const current = currentCompetence();
+  data.staff.forEach((member) => {
+    const amount = teamPaymentForStaff(member, data);
+    const existing = data.finance.find((item) => item.type === "Despesa" && displayText(item.center) === "Equipe" && item.relatedType === "Equipe" && item.relatedId === member.id && monthKey(item.date || today()) === current);
+    const legacy = data.finance.find((item) => item.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center)) && [member.id, member.name].includes(item.relatedId) && monthKey(item.date || today()) === current);
+    const target = existing || legacy;
+    if (target) {
+      target.description = `Repasse ${member.name}`;
+      target.amount = amount;
+      target.center = "Equipe";
+      target.relatedType = "Equipe";
+      target.relatedId = member.id;
+      target.competence = current;
+      if (!options.preserveStatus) target.status = target.status || "Pendente";
+    } else if (assignmentsForStaff(member.id, data).length) {
+      data.finance.unshift({
+        id: makeId("finance"),
+        type: "Despesa",
+        description: `Repasse ${member.name}`,
+        amount,
+        date: today(),
+        status: "Pendente",
+        center: "Equipe",
+        relatedType: "Equipe",
+        relatedId: member.id,
+        competence: current
+      });
+    }
+  });
 }
 
 function saveState() {
@@ -187,6 +314,7 @@ function render() {
   if (activeView === "alunos") renderStudents();
   if (activeView === "espera") renderWaitlist();
   if (activeView === "oficinas") renderWorkshops();
+  if (activeView === "equipe") renderTeam();
   if (activeView === "financeiro") renderFinance();
   bindActions();
 }
@@ -328,7 +456,7 @@ function upcomingActivities() {
         date: nextWeekdayDate(group.weekday),
         start: group.start,
         end: group.end,
-        therapist: group.therapist,
+        team: activityTeamLabel("class", group.id),
         room: group.room,
         capacity: group.capacity,
         count: classOccupancy(group).occupied,
@@ -344,7 +472,7 @@ function upcomingActivities() {
         date: workshop.type === "Recorrente" ? nextWeekdayDate(workshop.weekday) : (workshop.date || today()),
         start: workshop.start,
         end: workshop.end,
-        therapist: workshop.therapist,
+        team: activityTeamLabel("workshop", workshop.id),
         room: "",
         capacity: workshop.capacity,
         count: workshopParticipantsCount(workshop),
@@ -361,7 +489,7 @@ function activityRow(item) {
     <div class="data-row">
       <div>
         <h3>${item.name}</h3>
-        <p class="subtle">${item.kind} | ${friendlyDate(item.date)} | ${item.start}-${item.end} | ${item.therapist || "Sem terapeuta"}${item.room ? ` | ${item.room}` : ""}</p>
+        <p class="subtle">${item.kind} | ${friendlyDate(item.date)} | ${item.start}-${item.end} | ${item.team || "Sem equipe"}${item.room ? ` | ${item.room}` : ""}</p>
       </div>
       <div class="row-actions">
         <span class="tag blue">${item.count}/${item.capacity}</span>
@@ -458,7 +586,7 @@ function classCard(group) {
       <header>
         <div>
           <h3>${group.name}</h3>
-          <p class="subtle">${group.category} | ${group.weekday}, ${group.start}-${group.end} | ${group.therapist} | ${group.room}</p>
+          <p class="subtle">${group.category} | ${group.weekday}, ${group.start}-${group.end} | ${activityTeamLabel("class", group.id)} | ${group.room}</p>
         </div>
         ${statusPill(group.status)}
       </header>
@@ -596,7 +724,7 @@ function workshopCard(item) {
       <header>
         <div>
           <h3>${item.name}</h3>
-          <p class="subtle">${item.type} | ${item.weekday || item.date || "Sem data"} | ${item.start}-${item.end} | ${item.therapist}</p>
+          <p class="subtle">${item.type} | ${item.weekday || item.date || "Sem data"} | ${item.start}-${item.end} | ${activityTeamLabel("workshop", item.id)}</p>
         </div>
         ${statusPill(item.status)}
       </header>
@@ -607,6 +735,55 @@ function workshopCard(item) {
       <div class="card-actions">
         <button class="soft-button" data-open="workshop:${item.id}">Ver/Editar</button>
         <button class="danger-button" data-delete-record="workshop:${item.id}">Excluir</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderTeam() {
+  titleEl.textContent = "Equipe";
+  viewEl.innerHTML = `
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h2>Terapeutas e estagiários</h2>
+          <p>Cadastro da equipe e valores por hora usados nos repasses.</p>
+        </div>
+        <button class="primary-button" data-open="staff:new">Novo profissional</button>
+      </div>
+      <div class="records-grid">
+        ${state.staff.length ? state.staff.map(staffCard).join("") : `<p class="empty">Nenhum profissional cadastrado.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function staffCard(member) {
+  const assignments = assignmentsForStaff(member.id);
+  const hours = assignmentHoursForStaff(member.id);
+  const rate = hourlyRateForStaff(member);
+  return `
+    <article class="record-card">
+      <header>
+        <div>
+          <h3>${member.name}</h3>
+          <p class="subtle">${member.category} | ${member.phone || "Sem telefone"}</p>
+        </div>
+        ${statusPill(member.status)}
+      </header>
+      <div class="inline-list">
+        <span class="tag blue">${currency(rate)}/h</span>
+        <span class="tag">${formatHours(hours)}</span>
+        <span class="tag green">${currency(hours * rate)}</span>
+      </div>
+      <ul class="mini-list">
+        <li>Atividades: ${assignments.map(assignmentLabel).join(", ") || "Nenhuma atividade designada"}</li>
+        <li>Valor usado: ${member.hourlyRate ? "individual" : "referência da categoria"}</li>
+        <li>Observações: ${member.notes || "Sem observações"}</li>
+      </ul>
+      <div class="card-actions">
+        <button class="soft-button" data-open="staff:${member.id}">Ver/Editar</button>
+        <button class="danger-button" data-delete-record="staff:${member.id}">Excluir</button>
       </div>
     </article>
   `;
@@ -627,6 +804,7 @@ function renderFinance() {
           </div>
         </div>
         <div class="stack">
+          ${hourlyRatesGroup()}
           ${financeGroup("Mensalidade dos alunos", `Recebimentos do mês ${currentCompetenceLabel()} vinculados aos alunos.`, currentTuitionRows())}
           ${therapistFinanceGroup()}
           ${costsFinanceGroup()}
@@ -653,7 +831,7 @@ function financeResultPanel() {
         ${financeResultCard("Entradas previstas", data.expectedRevenue)}
         ${financeResultCard("Custos fixos", data.fixedCosts)}
         ${financeResultCard("Custos variáveis", data.variableCosts)}
-        ${financeResultCard("Repasses terapeutas", data.therapistCosts)}
+        ${financeResultCard("Repasses equipe", data.therapistCosts)}
         ${financeResultCard("Total de custos", data.totalCosts)}
       </div>
       <div class="finance-result-total ${data.realizedProfit < 0 ? "negative" : "positive"}">
@@ -685,7 +863,7 @@ function financeSummary() {
   const rows = financeRowsForCurrentMonth().filter((item) => item.status !== "Cancelado");
   const revenueRows = rows.filter((item) => item.type !== "Despesa" && item.status !== "Isento");
   const expenseRows = rows.filter((item) => item.type === "Despesa");
-  const costRows = expenseRows.filter((item) => item.center !== "Terapeutas");
+  const costRows = expenseRows.filter((item) => displayText(item.center) !== "Equipe" && displayText(item.center) !== "Terapeutas");
   const fixedRows = costRows.filter((item) => costKind(item) === "fixo");
   const variableRows = costRows.filter((item) => costKind(item) === "variavel");
   const receivedRevenue = sumAmounts(revenueRows.filter((item) => item.status === "Pago"));
@@ -742,31 +920,50 @@ function financeGroup(title, description, rows) {
   `;
 }
 
+function hourlyRatesGroup() {
+  return `
+    <article class="record-card">
+      <header>
+        <div>
+          <h3>Valores de referência</h3>
+          <p class="subtle">Valores por hora usados para recalcular os repasses da equipe.</p>
+        </div>
+        <button class="soft-button" data-open="rates:edit">Editar valores</button>
+      </header>
+      <div class="finance-result-grid">
+        ${financeResultCard("Hora terapeuta", state.settings.hourlyRates.terapeuta)}
+        ${financeResultCard("Hora estagiário", state.settings.hourlyRates.estagiario)}
+      </div>
+    </article>
+  `;
+}
+
 function therapistFinanceGroup() {
-  const therapists = therapistsForFinanceGroup();
-  const rows = visibleTherapistFinanceRows(therapists);
+  syncTeamPayroll();
+  const members = staffForFinanceGroup();
+  const rows = visibleTherapistFinanceRows(members);
   const total = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   return `
     <article class="record-card">
       <header>
         <div>
-          <h3>Repasse aos terapeutas</h3>
-          <p class="subtle">Terapeutas cadastrados nas oficinas e horas contratadas.</p>
+          <h3>Repasse da equipe</h3>
+          <p class="subtle">Terapeutas e estagiários designados nas turmas e oficinas.</p>
         </div>
         <div class="row-actions">
           <span class="tag blue">${currency(total)}</span>
-          <button class="soft-button" data-open="therapist:new">Novo terapeuta</button>
+          <button class="soft-button" data-open="staff:new">Novo profissional</button>
         </div>
       </header>
       <div class="stack">
-        ${therapists.length ? therapists.map(therapistRow).join("") : `<p class="empty">Nenhum terapeuta cadastrado.</p>`}
+        ${members.length ? members.map(therapistRow).join("") : `<p class="empty">Nenhum profissional designado.</p>`}
       </div>
     </article>
   `;
 }
 
 function costsFinanceGroup() {
-  const rows = financeRowsForCurrentMonth().filter((item) => item.type === "Despesa" && item.center !== "Terapeutas");
+  const rows = financeRowsForCurrentMonth().filter((item) => item.type === "Despesa" && !["Equipe", "Terapeutas"].includes(displayText(item.center)));
   const fixedRows = rows.filter((item) => costKind(item) === "fixo");
   const variableRows = rows.filter((item) => costKind(item) === "variavel");
   const total = rows
@@ -832,18 +1029,20 @@ function costRow(item) {
   `;
 }
 
-function therapistRow(name) {
-  const repasse = financeForTherapist(name);
+function therapistRow(member) {
+  const repasse = financeForTherapist(member.id);
+  const hours = assignmentHoursForStaff(member.id);
+  const activities = assignmentsForStaff(member.id).map(assignmentLabel).join(", ") || "Nenhuma atividade";
   return `
     <div class="data-row">
       <div>
-        <h3>${name}</h3>
-        <p class="subtle">Horas contratadas: ${formatHours(workshopHoursForTherapist(name))} | Oficina assumida: ${workshopNamesForTherapist(name)} | ${currency(Number(repasse?.amount || 0))}</p>
+        <h3>${member.name}</h3>
+        <p class="subtle">${member.category} | Horas contratadas: ${formatHours(hours)} | Atividades: ${activities} | ${currency(Number(repasse?.amount || 0))}</p>
       </div>
       <div class="row-actions">
         ${repasse ? financePill(repasse.status) : `<span class="pill neutral">Sem repasse</span>`}
-        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-delete-finance="${repasse.id}">Limpar repasse</button>` : `<button class="soft-button" data-open="therapist:${encodeURIComponent(name)}">Adicionar repasse</button>`}
-        <button class="danger-button" data-delete-therapist="${escapeHtml(name)}">Excluir terapeuta</button>
+        ${repasse ? `<button class="soft-button" data-open="finance:${repasse.id}">Ver/Editar</button><button class="danger-button" data-delete-finance="${repasse.id}">Limpar repasse</button>` : `<button class="soft-button" data-open="staff:${member.id}">Editar equipe</button>`}
+        <button class="danger-button" data-delete-record="staff:${member.id}">Excluir</button>
       </div>
     </div>
   `;
@@ -871,10 +1070,10 @@ function financeDetail(item) {
     const plan = student ? planById(student.planId) : null;
     return `Competência: ${competenceLabel(item.competence)} | Vencimento: ${item.date || "Não informado"} | Pacote contratado: ${plan?.name || "Não informado"} | ${currency(Number(item.amount || 0))}`;
   }
-  if (item.type === "Despesa" && item.center === "Terapeutas") {
-    const therapist = therapistNameForFinance(item);
-    const hours = workshopHoursForTherapist(therapist);
-    return `Horas contratadas: ${formatHours(hours)} | Oficina assumida: ${workshopNamesForTherapist(therapist)} | ${currency(Number(item.amount || 0))}`;
+  if (item.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center))) {
+    const member = staffByFinance(item);
+    const hours = member ? assignmentHoursForStaff(member.id) : 0;
+    return `Horas contratadas: ${formatHours(hours)} | Atividades: ${member ? assignmentsForStaff(member.id).map(assignmentLabel).join(", ") : "Não informada"} | ${currency(Number(item.amount || 0))}`;
   }
   return `${item.type} | ${item.date} | ${item.center || "Sem centro"} | ${currency(Number(item.amount || 0))}`;
 }
@@ -917,8 +1116,72 @@ function therapistsForFinanceGroup() {
     .sort((a, b) => a.localeCompare(b));
 }
 
-function financeForTherapist(name) {
+function legacyFinanceForTherapist(name) {
   const rows = state.finance.filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado" && therapistNameForFinance(item) === name);
+  return rows.find((item) => monthKey(item.date || today()) === currentCompetence()) || rows[0];
+}
+
+function staffById(id) {
+  return state.staff.find((item) => item.id === id);
+}
+
+function staffByFinance(item) {
+  return staffById(item.relatedId) || state.staff.find((member) => member.name === therapistNameForFinance(item));
+}
+
+function assignmentsForActivity(activityType, activityId, data = state) {
+  return data.assignments.filter((item) => item.activityType === activityType && item.activityId === activityId && data.staff.some((member) => member.id === item.staffId));
+}
+
+function assignmentsForStaff(staffId, data = state) {
+  return data.assignments.filter((item) => item.staffId === staffId && activityByAssignment(item, data));
+}
+
+function assignmentHoursForStaff(staffId, data = state) {
+  return assignmentsForStaff(staffId, data).reduce((sum, item) => sum + Number(item.hours || 0), 0);
+}
+
+function hourlyRateForStaff(member, data = state) {
+  if (!member) return 0;
+  if (member.hourlyRate !== "" && member.hourlyRate !== null && member.hourlyRate !== undefined && Number(member.hourlyRate) > 0) return Number(member.hourlyRate);
+  const key = normalizeKey(member.category) === "estagiario" ? "estagiario" : "terapeuta";
+  return Number(data.settings?.hourlyRates?.[key] || defaultHourlyRates[key] || 0);
+}
+
+function teamPaymentForStaff(member, data = state) {
+  return assignmentHoursForStaff(member.id, data) * hourlyRateForStaff(member, data);
+}
+
+function activityByAssignment(assignment, data = state) {
+  const collection = assignment.activityType === "class" ? data.classes : data.workshops;
+  return collection.find((item) => item.id === assignment.activityId);
+}
+
+function assignmentLabel(assignment) {
+  const activity = activityByAssignment(assignment);
+  if (!activity) return "Atividade removida";
+  return `${activity.name} (${formatHours(Number(assignment.hours || 0))})`;
+}
+
+function activityTeamLabel(activityType, activityId) {
+  const names = assignmentsForActivity(activityType, activityId)
+    .map((item) => staffById(item.staffId)?.name)
+    .filter(Boolean);
+  return names.length ? names.join(", ") : "Sem equipe";
+}
+
+function staffForFinanceGroup() {
+  return state.staff
+    .filter((member) => assignmentsForStaff(member.id).length || financeForTherapist(member.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function financeForTherapist(staffId) {
+  const member = staffById(staffId);
+  const rows = state.finance.filter((item) => {
+    if (item.type !== "Despesa" || !["Equipe", "Terapeutas"].includes(displayText(item.center)) || item.status === "Cancelado") return false;
+    return item.relatedId === staffId || (member && therapistNameForFinance(item) === member.name);
+  });
   return rows.find((item) => monthKey(item.date || today()) === currentCompetence()) || rows[0];
 }
 
@@ -955,6 +1218,8 @@ function openByToken(token) {
   if (type === "workshop") openDrawer("workshop", id === "new" ? null : id);
   if (type === "finance") openDrawer(id === "tuition" ? "tuition" : "finance", id === "new" || id === "tuition" ? null : id);
   if (type === "cost") openDrawer("cost", id === "new" ? null : id);
+  if (type === "staff") openDrawer("staff", id === "new" ? null : id);
+  if (type === "rates") openDrawer("rates", "settings");
   if (type === "therapist") openDrawer("therapist", id === "new" ? null : decodeURIComponent(id));
   if (type === "enrollment") openEnrollmentDrawer({ classId: id });
   if (type === "studentEnrollment") openEnrollmentDrawer({ studentId: id });
@@ -962,7 +1227,7 @@ function openByToken(token) {
 
 function openDrawer(kind, id) {
   drawerContext = { kind, id };
-  const record = kind === "therapist" ? defaultsForTherapist(id) : id ? collectionFor(kind).find((item) => item.id === id) : defaultsFor(kind);
+  const record = kind === "therapist" ? defaultsForTherapist(id) : kind === "rates" ? state.settings.hourlyRates : id ? collectionFor(kind).find((item) => item.id === id) : defaultsFor(kind);
   drawerEl.innerHTML = drawerTemplate(kind, record, Boolean(id));
   drawerEl.classList.add("open");
   drawerEl.setAttribute("aria-hidden", "false");
@@ -985,7 +1250,7 @@ function drawerTemplate(kind, record, isEdit) {
       <div class="drawer-actions">
         <button class="primary-button" type="submit">Salvar alterações</button>
         <button class="ghost-button" type="button" data-close>Cancelar</button>
-        ${isEdit && kind !== "tuition" ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
+        ${isEdit && !["tuition", "rates"].includes(kind) ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
       </div>
     </form>
   `;
@@ -1005,8 +1270,14 @@ function bindDrawerForm(kind, id) {
     }
   }
   if (kind === "finance") bindTuitionFinanceForm();
-  if (kind === "class") bindClassEnrollmentForm(id);
-  if (kind === "workshop") bindWorkshopStudentForm(id);
+  if (kind === "class") {
+    bindTeamAssignmentForm("class", id);
+    bindClassEnrollmentForm(id);
+  }
+  if (kind === "workshop") {
+    bindTeamAssignmentForm("workshop", id);
+    bindWorkshopStudentForm(id);
+  }
   drawerEl.querySelector("#drawerForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target).entries());
@@ -1015,6 +1286,28 @@ function bindDrawerForm(kind, id) {
       closeDrawer();
       render();
     }
+  });
+}
+
+function bindTeamAssignmentForm(activityType, activityId) {
+  drawerEl.querySelector("[data-add-team-assignment]")?.addEventListener("click", () => {
+    const staffId = drawerEl.querySelector('select[name="newStaffId"]')?.value || "";
+    const hours = Number(drawerEl.querySelector('input[name="newStaffHours"]')?.value || 0);
+    if (addTeamAssignment(activityType, activityId, staffId, hours)) {
+      render();
+      const record = activityType === "class" ? classById(activityId) : state.workshops.find((item) => item.id === activityId);
+      drawerEl.innerHTML = drawerTemplate(activityType === "class" ? "class" : "workshop", record, true);
+      bindDrawerForm(activityType === "class" ? "class" : "workshop", activityId);
+    }
+  });
+  drawerEl.querySelectorAll("[data-remove-assignment]").forEach((button) => {
+    button.addEventListener("click", () => {
+      removeTeamAssignment(button.dataset.removeAssignment);
+      render();
+      const record = activityType === "class" ? classById(activityId) : state.workshops.find((item) => item.id === activityId);
+      drawerEl.innerHTML = drawerTemplate(activityType === "class" ? "class" : "workshop", record, true);
+      bindDrawerForm(activityType === "class" ? "class" : "workshop", activityId);
+    });
   });
 }
 
@@ -1127,7 +1420,9 @@ function saveRecord(kind, id, values) {
     return false;
   }
   if (kind === "tuition") return createTuition(values);
+  if (kind === "rates") return saveHourlyRates(values);
   if (kind === "therapist") return saveTherapist(values);
+  if (kind === "staff") return saveStaff(id, values);
   if (kind === "finance" && values.type === "Mensalidade" && values.relatedType === "Aluno") return saveTuitionFinance(id, values);
 
   const collection = collectionFor(kind);
@@ -1216,6 +1511,40 @@ function addStudentToWorkshop(workshopId, studentId) {
   return true;
 }
 
+function addTeamAssignment(activityType, activityId, staffId, hours) {
+  const member = staffById(staffId);
+  const activity = activityType === "class" ? classById(activityId) : state.workshops.find((item) => item.id === activityId);
+  if (!member || !activity) {
+    notify("Selecione profissional e atividade.");
+    return false;
+  }
+  if (member.status !== "Ativo") {
+    notify("Profissional inativo não pode ser designado.");
+    return false;
+  }
+  if (hours <= 0) {
+    notify("Informe as horas contratadas.");
+    return false;
+  }
+  const exists = state.assignments.some((item) => item.activityType === activityType && item.activityId === activityId && item.staffId === staffId);
+  if (exists) {
+    notify("Profissional já está nesta atividade.");
+    return false;
+  }
+  state.assignments.push({ id: makeId("assignment"), activityType, activityId, staffId, hours });
+  syncTeamPayroll();
+  saveState();
+  notify("Profissional adicionado à atividade.");
+  return true;
+}
+
+function removeTeamAssignment(id) {
+  state.assignments = state.assignments.filter((item) => item.id !== id);
+  syncTeamPayroll();
+  saveState();
+  notify("Profissional removido da atividade.");
+}
+
 function saveTuitionFinance(id, values) {
   const tuition = state.finance.find((item) => item.id === id);
   const student = studentById(values.relatedId);
@@ -1280,6 +1609,48 @@ function createTuition(values) {
   });
   saveState();
   notify("Mensalidade gerada.");
+  return true;
+}
+
+function saveStaff(id, values) {
+  const name = String(values.name || "").trim();
+  if (!name) {
+    notify("Informe o nome do profissional.");
+    return false;
+  }
+  const prepared = {
+    name,
+    category: values.category || "Terapeuta",
+    phone: values.phone || "",
+    hourlyRate: values.hourlyRate === "" ? "" : Number(values.hourlyRate || 0),
+    status: values.status || "Ativo",
+    notes: values.notes || ""
+  };
+  if (id) {
+    const index = state.staff.findIndex((item) => item.id === id);
+    if (index < 0) {
+      notify("Profissional não encontrado.");
+      return false;
+    }
+    state.staff[index] = { ...state.staff[index], ...prepared };
+    notify("Profissional atualizado.");
+  } else {
+    state.staff.unshift({ ...prepared, id: makeId("staff") });
+    notify("Profissional criado.");
+  }
+  syncTeamPayroll();
+  saveState();
+  return true;
+}
+
+function saveHourlyRates(values) {
+  state.settings.hourlyRates = {
+    terapeuta: Number(values.therapistRate || defaultHourlyRates.terapeuta),
+    estagiario: Number(values.internRate || defaultHourlyRates.estagiario)
+  };
+  syncTeamPayroll();
+  saveState();
+  notify("Valores de referência atualizados.");
   return true;
 }
 
@@ -1372,6 +1743,7 @@ function deleteRecord(kind, id) {
     if (!group) return notify("Turma não encontrada.");
     state.classes = state.classes.filter((item) => item.id !== id);
     state.enrollments = state.enrollments.filter((item) => item.classId !== id);
+    state.assignments = state.assignments.filter((item) => !(item.activityType === "class" && item.activityId === id));
     state.finance = state.finance.filter((item) => !(item.relatedType === "Turma" && item.relatedId === id));
     notify("Turma excluída.");
   } else if (kind === "wait") {
@@ -1383,8 +1755,16 @@ function deleteRecord(kind, id) {
     const workshop = state.workshops.find((item) => item.id === id);
     if (!workshop) return notify("Oficina não encontrada.");
     state.workshops = state.workshops.filter((item) => item.id !== id);
+    state.assignments = state.assignments.filter((item) => !(item.activityType === "workshop" && item.activityId === id));
     state.finance = state.finance.filter((item) => !(item.relatedType === "Oficina" && item.relatedId === id));
     notify("Oficina excluída.");
+  } else if (kind === "staff") {
+    const member = staffById(id);
+    if (!member) return notify("Profissional não encontrado.");
+    state.staff = state.staff.filter((item) => item.id !== id);
+    state.assignments = state.assignments.filter((item) => item.staffId !== id);
+    state.finance = state.finance.filter((item) => !(item.relatedType === "Equipe" && item.relatedId === id));
+    notify("Profissional excluído.");
   } else if (kind === "therapist") {
     const before = state.finance.length;
     state.finance = state.finance.filter((item) => !(item.relatedType === "Terapeuta" && item.relatedId === id));
@@ -1394,13 +1774,14 @@ function deleteRecord(kind, id) {
     deleteFinance(id);
     return;
   }
+  syncTeamPayroll();
   saveState();
   closeDrawer();
   render();
 }
 
 function deleteCost(id) {
-  const item = state.finance.find((entry) => entry.id === id && entry.type === "Despesa" && entry.center !== "Terapeutas");
+  const item = state.finance.find((entry) => entry.id === id && entry.type === "Despesa" && !["Equipe", "Terapeutas"].includes(displayText(entry.center)));
   if (!item) {
     notify("Custo não encontrado.");
     return;
@@ -1486,12 +1867,12 @@ function fieldsFor(kind, record) {
         ${inputField("start", "Horário início", record.start, "time")}
         ${inputField("end", "Horário fim", record.end, "time")}
       </div>
-      ${inputField("therapist", "Terapeuta", record.therapist)}
       <div class="field-grid">
         ${inputField("room", "Sala", record.room)}
         ${inputField("capacity", "Capacidade", record.capacity, "number")}
       </div>
       ${selectField("status", "Status", ["Ativa", "Em formação", "Encerrada"], record.status)}
+      ${record.id ? teamAssignmentFields("class", record) : ""}
       ${record.id ? classEnrollmentFields(record) : ""}
     `;
   }
@@ -1522,8 +1903,8 @@ function fieldsFor(kind, record) {
         ${inputField("start", "Horário início", record.start, "time")}
         ${inputField("end", "Horário fim", record.end, "time")}
       </div>
-      ${inputField("therapist", "Terapeuta", record.therapist)}
       ${inputField("capacity", "Capacidade", record.capacity, "number")}
+      ${record.id ? teamAssignmentFields("workshop", record) : ""}
       ${record.id ? workshopStudentFields(record) : ""}
     `;
   }
@@ -1562,7 +1943,7 @@ function fieldsFor(kind, record) {
         ${inputField("amount", "Valor", record.amount, "number")}
         ${inputField("date", "Data", record.date, "date")}
       </div>
-      ${selectField("center", "Centro de custo", centers.filter((item) => item !== "Terapeutas"), record.center)}
+      ${selectField("center", "Centro de custo", centers.filter((item) => item !== "Equipe" && item !== "Terapeutas"), record.center)}
     `;
   }
   if (kind === "tuition") {
@@ -1588,6 +1969,33 @@ function fieldsFor(kind, record) {
       </div>
     `;
   }
+  if (kind === "staff") {
+    return `
+      ${inputField("name", "Nome", record.name)}
+      <div class="field-grid">
+        ${selectField("category", "Categoria", staffCategories, record.category || "Terapeuta")}
+        ${selectField("status", "Status", ["Ativo", "Inativo"], record.status || "Ativo")}
+      </div>
+      <div class="field-grid">
+        ${inputField("phone", "Telefone", record.phone || "")}
+        ${inputField("hourlyRate", "Valor/hora individual opcional", record.hourlyRate || "", "number")}
+      </div>
+      ${readonlyField("Valor usado hoje", currency(hourlyRateForStaff(record)))}
+      ${textField("notes", "Observações", record.notes || "")}
+    `;
+  }
+  if (kind === "rates") {
+    return `
+      <section class="drawer-section">
+        <h3>Valores de referência</h3>
+        <div class="field-grid">
+          ${inputField("therapistRate", "Hora terapeuta", record.terapeuta || defaultHourlyRates.terapeuta, "number")}
+          ${inputField("internRate", "Hora estagiário", record.estagiario || defaultHourlyRates.estagiario, "number")}
+        </div>
+        <p class="drawer-note">Ao salvar, todos os repasses da equipe são recalculados automaticamente. Valores individuais cadastrados em cada profissional continuam tendo prioridade.</p>
+      </section>
+    `;
+  }
   return "";
 }
 
@@ -1598,7 +2006,45 @@ function defaultsFor(kind) {
   if (kind === "workshop") return { name: "", type: "Avulsa", date: today(), weekday: "", start: "10:00", end: "11:00", therapist: "", capacity: 10, participants: 0, status: "Planejada" };
   if (kind === "finance") return { type: "Receita", description: "", amount: 0, date: today(), status: "Pago", center: "Operação", relatedType: "Geral", relatedId: "" };
   if (kind === "cost") return { type: "Despesa", description: "", costType: "Fixo", amount: 0, date: today(), status: "Pago", center: "Estrutura", relatedType: "Geral", relatedId: "" };
+  if (kind === "staff") return { name: "", category: "Terapeuta", phone: "", hourlyRate: "", status: "Ativo", notes: "" };
   return {};
+}
+
+function teamAssignmentFields(activityType, activity) {
+  const assignments = assignmentsForActivity(activityType, activity.id);
+  const assignedIds = assignments.map((item) => item.staffId);
+  const available = state.staff.filter((member) => member.status === "Ativo" && !assignedIds.includes(member.id));
+  const defaultHours = durationHours(activity.start, activity.end) || 1;
+  const options = [["", available.length ? "Selecione um profissional" : "Nenhum profissional ativo disponível"]];
+  available.forEach((member) => options.push([member.id, `${member.name} - ${member.category}`]));
+  return `
+    <section class="drawer-section">
+      <h3>Equipe designada</h3>
+      <div class="stack">
+        ${assignments.length ? assignments.map((assignment) => {
+          const member = staffById(assignment.staffId);
+          return `
+            <div class="data-row">
+              <div>
+                <h3>${member?.name || "Profissional removido"}</h3>
+                <p class="subtle">${member?.category || "Equipe"} | ${formatHours(Number(assignment.hours || 0))} | ${currency(Number(assignment.hours || 0) * hourlyRateForStaff(member))}</p>
+              </div>
+              <div class="row-actions">
+                <button class="danger-button" type="button" data-remove-assignment="${assignment.id}">Remover</button>
+              </div>
+            </div>
+          `;
+        }).join("") : `<p class="drawer-note">Nenhum profissional designado.</p>`}
+      </div>
+      <div class="field-grid">
+        ${selectField("newStaffId", "Adicionar profissional", options, "")}
+        ${inputField("newStaffHours", "Horas contratadas", defaultHours, "number", "step=\"0.5\" min=\"0\"")}
+      </div>
+      <div class="row-actions">
+        <button class="soft-button" type="button" data-add-team-assignment ${available.length ? "" : "disabled"}>Adicionar profissional</button>
+      </div>
+    </section>
+  `;
 }
 
 function classEnrollmentFields(group) {
@@ -1626,9 +2072,9 @@ function classEnrollmentFields(group) {
   `;
 }
 
-function visibleTherapistFinanceRows(therapists = therapistsForFinanceGroup()) {
-  return therapists
-    .map((name) => financeForTherapist(name))
+function visibleTherapistFinanceRows(members = staffForFinanceGroup()) {
+  return members
+    .map((member) => financeForTherapist(member.id))
     .filter(Boolean)
     .filter((item) => item.status !== "Cancelado");
 }
@@ -1717,9 +2163,13 @@ function prepareRecord(kind, id, values) {
   if (kind === "class") {
     delete prepared.newStudentId;
     delete prepared.enrollmentStartDate;
+    delete prepared.newStaffId;
+    delete prepared.newStaffHours;
   }
   if (kind === "workshop") {
     delete prepared.newWorkshopStudentId;
+    delete prepared.newStaffId;
+    delete prepared.newStaffHours;
     prepared.studentIds = Array.isArray(prepared.studentIds) ? prepared.studentIds : (id ? (state.workshops.find((item) => item.id === id)?.studentIds || []) : []);
     prepared.participants = prepared.studentIds.length;
   }
@@ -1742,11 +2192,12 @@ function collectionFor(kind) {
   if (kind === "workshop") return state.workshops;
   if (kind === "finance") return state.finance;
   if (kind === "cost") return state.finance;
+  if (kind === "staff") return state.staff;
   return [];
 }
 
 function drawerTitle(kind, isEdit) {
-  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lançamento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta" };
+  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lançamento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta", staff: "profissional", rates: "valores de referência" };
   return `${isEdit ? "Editar" : "Criar"} ${names[kind] || "registro"}`;
 }
 
