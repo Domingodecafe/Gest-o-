@@ -133,7 +133,7 @@ function normalizeState(data) {
   normalized.finance = normalized.finance.map((item) => ({
     ...item,
     description: cleanFinanceDescription(item.description),
-    competence: item.type === "Mensalidade" ? (item.competence || monthKey(item.date || today())) : item.competence,
+    competence: item.competence || monthKey(item.date || today()),
     center: displayText(item.center),
     status: displayText(item.status),
     ...normalizeFinanceRelation(item)
@@ -267,16 +267,17 @@ function syncTeamPayroll(data = state, options = {}) {
   const current = currentCompetence();
   data.staff.forEach((member) => {
     const amount = teamPaymentForStaff(member, data);
-    const existing = data.finance.find((item) => item.type === "Despesa" && displayText(item.center) === "Equipe" && item.relatedType === "Equipe" && item.relatedId === member.id && monthKey(item.date || today()) === current);
-    const legacy = data.finance.find((item) => item.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center)) && [member.id, member.name].includes(item.relatedId) && monthKey(item.date || today()) === current);
+    const existing = data.finance.find((item) => item.type === "Despesa" && displayText(item.center) === "Equipe" && item.relatedType === "Equipe" && item.relatedId === member.id && financeCompetence(item) === current);
+    const legacy = data.finance.find((item) => item.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center)) && [member.id, member.name].includes(item.relatedId) && financeCompetence(item) === current);
     const target = existing || legacy;
     if (target) {
       target.description = `Repasse ${member.name}`;
-      target.amount = amount;
+      if (!target.manualAmount) target.amount = amount;
       target.center = "Equipe";
       target.relatedType = "Equipe";
       target.relatedId = member.id;
       target.competence = current;
+      target.contractDate = target.contractDate || target.date || today();
       if (!options.preserveStatus) target.status = target.status || "Pendente";
     } else if (assignmentsForStaff(member.id, data).length) {
       data.finance.unshift({
@@ -289,7 +290,9 @@ function syncTeamPayroll(data = state, options = {}) {
         center: "Equipe",
         relatedType: "Equipe",
         relatedId: member.id,
-        competence: current
+        competence: current,
+        contractDate: today(),
+        manualAmount: false
       });
     }
   });
@@ -747,7 +750,7 @@ function renderTeam() {
       <div class="section-head">
         <div>
           <h2>Terapeutas e estagiários</h2>
-          <p>Cadastro da equipe e valores por hora usados nos repasses.</p>
+          <p>Cadastro da equipe e atividades designadas.</p>
         </div>
         <button class="primary-button" data-open="staff:new">Novo profissional</button>
       </div>
@@ -761,7 +764,6 @@ function renderTeam() {
 function staffCard(member) {
   const assignments = assignmentsForStaff(member.id);
   const hours = assignmentHoursForStaff(member.id);
-  const rate = hourlyRateForStaff(member);
   return `
     <article class="record-card">
       <header>
@@ -772,13 +774,11 @@ function staffCard(member) {
         ${statusPill(member.status)}
       </header>
       <div class="inline-list">
-        <span class="tag blue">${currency(rate)}/h</span>
         <span class="tag">${formatHours(hours)}</span>
-        <span class="tag green">${currency(hours * rate)}</span>
+        <span class="tag blue">${assignments.length} atividade(s)</span>
       </div>
       <ul class="mini-list">
         <li>Atividades: ${assignments.map(assignmentLabel).join(", ") || "Nenhuma atividade designada"}</li>
-        <li>Valor usado: ${member.hourlyRate ? "individual" : "referência da categoria"}</li>
         <li>Observações: ${member.notes || "Sem observações"}</li>
       </ul>
       <div class="card-actions">
@@ -804,7 +804,6 @@ function renderFinance() {
           </div>
         </div>
         <div class="stack">
-          ${hourlyRatesGroup()}
           ${financeGroup("Mensalidade dos alunos", `Recebimentos do mês ${currentCompetenceLabel()} vinculados aos alunos.`, currentTuitionRows())}
           ${therapistFinanceGroup()}
           ${costsFinanceGroup()}
@@ -891,8 +890,7 @@ function financeSummary() {
 function financeRowsForCurrentMonth() {
   const current = currentCompetence();
   return state.finance.filter((item) => {
-    if (item.type === "Mensalidade") return item.competence === current;
-    return monthKey(item.date || today()) === current;
+    return financeCompetence(item) === current;
   });
 }
 
@@ -952,9 +950,14 @@ function therapistFinanceGroup() {
         </div>
         <div class="row-actions">
           <span class="tag blue">${currency(total)}</span>
+          <button class="soft-button" data-open="rates:edit">Editar horas</button>
           <button class="soft-button" data-open="staff:new">Novo profissional</button>
         </div>
       </header>
+      <div class="finance-result-grid compact-result-grid">
+        ${financeResultCard("Hora terapeuta", state.settings.hourlyRates.terapeuta)}
+        ${financeResultCard("Hora estagiário", state.settings.hourlyRates.estagiario)}
+      </div>
       <div class="stack">
         ${members.length ? members.map(therapistRow).join("") : `<p class="empty">Nenhum profissional designado.</p>`}
       </div>
@@ -1032,12 +1035,13 @@ function costRow(item) {
 function therapistRow(member) {
   const repasse = financeForTherapist(member.id);
   const hours = assignmentHoursForStaff(member.id);
-  const activities = assignmentsForStaff(member.id).map(assignmentLabel).join(", ") || "Nenhuma atividade";
+  const amount = Number(repasse?.amount || 0);
+  const source = repasse?.manualAmount ? "manual" : "automático";
   return `
     <div class="data-row">
       <div>
         <h3>${member.name}</h3>
-        <p class="subtle">${member.category} | Horas contratadas: ${formatHours(hours)} | Atividades: ${activities} | ${currency(Number(repasse?.amount || 0))}</p>
+        <p class="subtle">Horas contratadas: ${formatHours(hours)} | Honorários: ${currency(amount)} (${source})</p>
       </div>
       <div class="row-actions">
         ${repasse ? financePill(repasse.status) : `<span class="pill neutral">Sem repasse</span>`}
@@ -1076,6 +1080,14 @@ function financeDetail(item) {
     return `Horas contratadas: ${formatHours(hours)} | Atividades: ${member ? assignmentsForStaff(member.id).map(assignmentLabel).join(", ") : "Não informada"} | ${currency(Number(item.amount || 0))}`;
   }
   return `${item.type} | ${item.date} | ${item.center || "Sem centro"} | ${currency(Number(item.amount || 0))}`;
+}
+
+function isTeamFinance(item) {
+  return item?.type === "Despesa" && ["Equipe", "Terapeutas"].includes(displayText(item.center));
+}
+
+function financeCompetence(item) {
+  return item?.competence || monthKey(item?.date || today());
 }
 
 function therapistNameForFinance(item) {
@@ -1118,7 +1130,7 @@ function therapistsForFinanceGroup() {
 
 function legacyFinanceForTherapist(name) {
   const rows = state.finance.filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado" && therapistNameForFinance(item) === name);
-  return rows.find((item) => monthKey(item.date || today()) === currentCompetence()) || rows[0];
+  return rows.find((item) => financeCompetence(item) === currentCompetence()) || rows[0];
 }
 
 function staffById(id) {
@@ -1143,7 +1155,6 @@ function assignmentHoursForStaff(staffId, data = state) {
 
 function hourlyRateForStaff(member, data = state) {
   if (!member) return 0;
-  if (member.hourlyRate !== "" && member.hourlyRate !== null && member.hourlyRate !== undefined && Number(member.hourlyRate) > 0) return Number(member.hourlyRate);
   const key = normalizeKey(member.category) === "estagiario" ? "estagiario" : "terapeuta";
   return Number(data.settings?.hourlyRates?.[key] || defaultHourlyRates[key] || 0);
 }
@@ -1260,6 +1271,12 @@ function bindDrawerForm(kind, id) {
   drawerEl.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", closeDrawer));
   const deleteButton = drawerEl.querySelector("[data-drawer-delete]");
   if (deleteButton) deleteButton.addEventListener("click", () => deleteRecord(kind, id));
+  drawerEl.querySelector("[data-use-auto-team-payment]")?.addEventListener("click", () => {
+    if (useAutomaticTeamPayment(id)) {
+      closeDrawer();
+      render();
+    }
+  });
   if (kind === "student") {
     const birthDateInput = drawerEl.querySelector('input[name="birthDate"]');
     const ageInput = drawerEl.querySelector('input[name="age"]');
@@ -1411,6 +1428,7 @@ function closeDrawer() {
 }
 
 function saveRecord(kind, id, values) {
+  if (kind === "finance" && values.type === "Despesa" && values.relatedType === "Equipe") return saveTeamFinance(id, values);
   if (kind === "finance" && values.type === "Despesa" && !values.center) {
     notify("Despesa precisa de centro de custo.");
     return false;
@@ -1622,7 +1640,6 @@ function saveStaff(id, values) {
     name,
     category: values.category || "Terapeuta",
     phone: values.phone || "",
-    hourlyRate: values.hourlyRate === "" ? "" : Number(values.hourlyRate || 0),
     status: values.status || "Ativo",
     notes: values.notes || ""
   };
@@ -1651,6 +1668,49 @@ function saveHourlyRates(values) {
   syncTeamPayroll();
   saveState();
   notify("Valores de referência atualizados.");
+  return true;
+}
+
+function saveTeamFinance(id, values) {
+  const item = state.finance.find((entry) => entry.id === id);
+  const member = item ? staffByFinance(item) : null;
+  if (!item || !member) {
+    notify("Repasse da equipe não encontrado.");
+    return false;
+  }
+  const automaticAmount = teamPaymentForStaff(member);
+  const amount = Number(values.amount || 0);
+  item.type = "Despesa";
+  item.description = `Repasse ${member.name}`;
+  item.amount = amount;
+  item.status = values.status || "Pendente";
+  item.date = values.contractDate || item.date || today();
+  item.contractDate = values.contractDate || item.contractDate || item.date || today();
+  item.competence = values.competence || currentCompetence();
+  item.center = "Equipe";
+  item.relatedType = "Equipe";
+  item.relatedId = member.id;
+  item.manualAmount = Math.abs(amount - automaticAmount) > 0.009;
+  saveState();
+  notify(item.manualAmount ? "Honorários manuais salvos." : "Repasse salvo no cálculo automático.");
+  return true;
+}
+
+function useAutomaticTeamPayment(id) {
+  const item = state.finance.find((entry) => entry.id === id);
+  const member = item ? staffByFinance(item) : null;
+  if (!item || !member) {
+    notify("Repasse da equipe não encontrado.");
+    return false;
+  }
+  item.amount = teamPaymentForStaff(member);
+  item.manualAmount = false;
+  item.center = "Equipe";
+  item.relatedType = "Equipe";
+  item.relatedId = member.id;
+  item.description = `Repasse ${member.name}`;
+  saveState();
+  notify("Repasse voltou ao cálculo automático.");
   return true;
 }
 
@@ -1912,6 +1972,9 @@ function fieldsFor(kind, record) {
     if (record.type === "Mensalidade" && record.relatedType === "Aluno") {
       return tuitionFinanceFields(record);
     }
+    if (isTeamFinance(record)) {
+      return teamFinanceFields(record);
+    }
     return `
       <div class="field-grid">
         ${selectField("type", "Tipo", ["Mensalidade", "Receita", "Despesa"], record.type)}
@@ -1976,11 +2039,7 @@ function fieldsFor(kind, record) {
         ${selectField("category", "Categoria", staffCategories, record.category || "Terapeuta")}
         ${selectField("status", "Status", ["Ativo", "Inativo"], record.status || "Ativo")}
       </div>
-      <div class="field-grid">
-        ${inputField("phone", "Telefone", record.phone || "")}
-        ${inputField("hourlyRate", "Valor/hora individual opcional", record.hourlyRate || "", "number")}
-      </div>
-      ${readonlyField("Valor usado hoje", currency(hourlyRateForStaff(record)))}
+      ${inputField("phone", "Telefone", record.phone || "")}
       ${textField("notes", "Observações", record.notes || "")}
     `;
   }
@@ -1992,7 +2051,7 @@ function fieldsFor(kind, record) {
           ${inputField("therapistRate", "Hora terapeuta", record.terapeuta || defaultHourlyRates.terapeuta, "number")}
           ${inputField("internRate", "Hora estagiário", record.estagiario || defaultHourlyRates.estagiario, "number")}
         </div>
-        <p class="drawer-note">Ao salvar, todos os repasses da equipe são recalculados automaticamente. Valores individuais cadastrados em cada profissional continuam tendo prioridade.</p>
+        <p class="drawer-note">Ao salvar, repasses automáticos serão recalculados. Honorários editados manualmente serão preservados.</p>
       </section>
     `;
   }
@@ -2006,8 +2065,40 @@ function defaultsFor(kind) {
   if (kind === "workshop") return { name: "", type: "Avulsa", date: today(), weekday: "", start: "10:00", end: "11:00", therapist: "", capacity: 10, participants: 0, status: "Planejada" };
   if (kind === "finance") return { type: "Receita", description: "", amount: 0, date: today(), status: "Pago", center: "Operação", relatedType: "Geral", relatedId: "" };
   if (kind === "cost") return { type: "Despesa", description: "", costType: "Fixo", amount: 0, date: today(), status: "Pago", center: "Estrutura", relatedType: "Geral", relatedId: "" };
-  if (kind === "staff") return { name: "", category: "Terapeuta", phone: "", hourlyRate: "", status: "Ativo", notes: "" };
+  if (kind === "staff") return { name: "", category: "Terapeuta", phone: "", status: "Ativo", notes: "" };
   return {};
+}
+
+function teamFinanceFields(record) {
+  const member = staffByFinance(record);
+  const hours = member ? assignmentHoursForStaff(member.id) : 0;
+  const activities = member ? assignmentsForStaff(member.id).map(assignmentLabel).join(", ") : "Não informada";
+  const automaticAmount = member ? teamPaymentForStaff(member) : Number(record.amount || 0);
+  return `
+    ${hiddenInput("type", "Despesa")}
+    ${hiddenInput("center", "Equipe")}
+    ${hiddenInput("relatedType", "Equipe")}
+    ${hiddenInput("relatedId", member?.id || record.relatedId || "")}
+    <section class="drawer-section">
+      <h3>Repasse da equipe</h3>
+      ${readonlyField("Profissional", member?.name || record.description || "Não informado")}
+      <div class="field-grid">
+        ${readonlyField("Categoria", member?.category || "Equipe")}
+        ${readonlyField("Horas contratadas", formatHours(hours))}
+      </div>
+      ${readonlyField("Atividades assumidas", activities)}
+      <div class="field-grid">
+        ${inputField("amount", "Honorários", record.amount || automaticAmount, "number")}
+        ${selectField("status", "Status", ["Pago", "Pendente", "Atrasado", "Cancelado"], record.status || "Pendente")}
+      </div>
+      <div class="field-grid">
+        ${inputField("contractDate", "Data de contratação", record.contractDate || record.date || today(), "date")}
+        ${inputField("competence", "Competência", record.competence || currentCompetence(), "month")}
+      </div>
+      <p class="drawer-note">Cálculo automático atual: ${formatHours(hours)} x ${currency(hourlyRateForStaff(member))}/h = ${currency(automaticAmount)}.</p>
+      ${record.manualAmount ? `<button class="soft-button" type="button" data-use-auto-team-payment>Usar cálculo automático</button>` : ""}
+    </section>
+  `;
 }
 
 function teamAssignmentFields(activityType, activity) {
