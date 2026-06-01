@@ -294,6 +294,25 @@ h3 {
   color: #9d351d;
 }
 
+.data-row .row-actions {
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.data-row .soft-button,
+.data-row .danger-button {
+  border-radius: 7px;
+  font-size: 0.9rem;
+  min-height: 34px;
+  padding: 7px 9px;
+}
+
+.data-row .tag,
+.data-row .pill {
+  font-size: 0.72rem;
+  padding: 5px 7px;
+}
+
 .summary-grid {
   display: grid;
   gap: 10px;
@@ -835,7 +854,9 @@ textarea:focus {
   .card-actions button,
   .data-row .row-actions button,
   .drawer-actions button {
+    font-size: 1rem;
     min-height: 44px;
+    padding: 9px 12px;
     width: 100%;
   }
 
