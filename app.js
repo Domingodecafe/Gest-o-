@@ -743,7 +743,7 @@ function financeGroup(title, description, rows) {
 }
 
 function therapistFinanceGroup() {
-  const therapists = therapistsFromWorkshops();
+  const therapists = therapistsForFinanceGroup();
   const rows = visibleTherapistFinanceRows(therapists);
   const total = rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   return `
@@ -759,7 +759,7 @@ function therapistFinanceGroup() {
         </div>
       </header>
       <div class="stack">
-        ${therapists.length ? therapists.map(therapistRow).join("") : `<p class="empty">Nenhum terapeuta cadastrado nas oficinas.</p>`}
+        ${therapists.length ? therapists.map(therapistRow).join("") : `<p class="empty">Nenhum terapeuta cadastrado.</p>`}
       </div>
     </article>
   `;
@@ -902,6 +902,18 @@ function therapistsFromWorkshops() {
     .filter((item) => item.status !== "Cancelada" && item.therapist)
     .map((item) => item.therapist)
   )].sort((a, b) => a.localeCompare(b));
+}
+
+function therapistsFromFinance() {
+  return state.finance
+    .filter((item) => item.type === "Despesa" && item.center === "Terapeutas" && item.status !== "Cancelado")
+    .map((item) => therapistNameForFinance(item))
+    .filter(Boolean);
+}
+
+function therapistsForFinanceGroup() {
+  return [...new Set([...therapistsFromWorkshops(), ...therapistsFromFinance()])]
+    .sort((a, b) => a.localeCompare(b));
 }
 
 function financeForTherapist(name) {
@@ -1590,7 +1602,7 @@ function classEnrollmentFields(group) {
   `;
 }
 
-function visibleTherapistFinanceRows(therapists = therapistsFromWorkshops()) {
+function visibleTherapistFinanceRows(therapists = therapistsForFinanceGroup()) {
   return therapists
     .map((name) => financeForTherapist(name))
     .filter(Boolean)
