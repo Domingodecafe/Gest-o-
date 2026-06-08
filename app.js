@@ -1,5 +1,5 @@
 const STORAGE_KEY = "lado-a-socios-v2";
-const planPrices = { basico: 1199, completo: 2160 };
+const defaultPlanPrices = { basico: 1199, completo: 2160 };
 const centers = ["Operação", "Equipe", "Marketing", "Oficinas", "Administrativo", "Estrutura", "Eventos"];
 const defaultHourlyRates = { terapeuta: 80, estagiario: 30 };
 const staffCategories = ["Terapeuta", "Estagiário"];
@@ -96,7 +96,7 @@ function loadState() {
 
 function normalizeState(data) {
   const normalized = normalizeStrings(structuredClone(data));
-  normalized.plans = normalized.plans.map((plan) => ({ ...plan, name: displayText(plan.name), monthly: planPrices[plan.id] || Number(plan.monthly || 0) }));
+  normalized.plans = normalized.plans.map((plan) => ({ ...plan, name: displayText(plan.name), monthly: Number(plan.monthly || defaultPlanPrices[plan.id] || 0) }));
   normalized.classes = normalized.classes.map((item) => ({
     ...item,
     weekday: displayText(item.weekday),
@@ -148,6 +148,7 @@ function normalizeState(data) {
 
 function normalizeTuitionAmount(item, normalizedState = state) {
   if (item.type !== "Mensalidade" || item.relatedType !== "Aluno") return item;
+  if (!shouldAutoUpdateTuition(item)) return item;
   const student = normalizedState.students.find((entry) => entry.id === item.relatedId);
   const plan = student ? normalizedState.plans.find((entry) => entry.id === student.planId) : null;
   if (!plan) return item;
@@ -804,13 +805,41 @@ function renderFinance() {
           </div>
         </div>
         <div class="stack">
-          ${financeGroup("Mensalidade dos alunos", `Recebimentos do mês ${currentCompetenceLabel()} vinculados aos alunos.`, currentTuitionRows())}
+          ${tuitionFinanceGroup()}
           ${therapistFinanceGroup()}
           ${costsFinanceGroup()}
         </div>
       </section>
       ${financeResultPanel()}
     </div>
+  `;
+}
+
+function tuitionFinanceGroup() {
+  const rows = currentTuitionRows();
+  const total = rows
+    .filter((item) => item.status !== "Cancelado")
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  return `
+    <article class="record-card">
+      <header>
+        <div>
+          <h3>Mensalidade dos alunos</h3>
+          <p class="subtle">Recebimentos do mês ${currentCompetenceLabel()} vinculados aos alunos.</p>
+        </div>
+        <div class="row-actions">
+          <span class="tag blue">${currency(total)}</span>
+          <button class="soft-button" data-open="planrates:edit">Editar valores</button>
+        </div>
+      </header>
+      <div class="finance-result-grid compact-result-grid">
+        ${financeResultCard("Pacote Básico", planById("basico")?.monthly || defaultPlanPrices.basico)}
+        ${financeResultCard("Pacote Completo", planById("completo")?.monthly || defaultPlanPrices.completo)}
+      </div>
+      <div class="stack">
+        ${rows.length ? rows.map(financeRow).join("") : `<p class="empty">Nenhum lançamento nesta caixa.</p>`}
+      </div>
+    </article>
   `;
 }
 
@@ -1231,6 +1260,7 @@ function openByToken(token) {
   if (type === "cost") openDrawer("cost", id === "new" ? null : id);
   if (type === "staff") openDrawer("staff", id === "new" ? null : id);
   if (type === "rates") openDrawer("rates", "settings");
+  if (type === "planrates") openDrawer("planrates", "plans");
   if (type === "therapist") openDrawer("therapist", id === "new" ? null : decodeURIComponent(id));
   if (type === "enrollment") openEnrollmentDrawer({ classId: id });
   if (type === "studentEnrollment") openEnrollmentDrawer({ studentId: id });
@@ -1238,7 +1268,7 @@ function openByToken(token) {
 
 function openDrawer(kind, id) {
   drawerContext = { kind, id };
-  const record = kind === "therapist" ? defaultsForTherapist(id) : kind === "rates" ? state.settings.hourlyRates : id ? collectionFor(kind).find((item) => item.id === id) : defaultsFor(kind);
+  const record = kind === "therapist" ? defaultsForTherapist(id) : kind === "rates" ? state.settings.hourlyRates : kind === "planrates" ? state.plans : id ? collectionFor(kind).find((item) => item.id === id) : defaultsFor(kind);
   drawerEl.innerHTML = drawerTemplate(kind, record, Boolean(id));
   drawerEl.classList.add("open");
   drawerEl.setAttribute("aria-hidden", "false");
@@ -1261,7 +1291,7 @@ function drawerTemplate(kind, record, isEdit) {
       <div class="drawer-actions">
         <button class="primary-button" type="submit">Salvar alterações</button>
         <button class="ghost-button" type="button" data-close>Cancelar</button>
-        ${isEdit && !["tuition", "rates"].includes(kind) ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
+        ${isEdit && !["tuition", "rates", "planrates"].includes(kind) ? `<button class="danger-button" type="button" data-drawer-delete>Excluir</button>` : ""}
       </div>
     </form>
   `;
@@ -1439,6 +1469,7 @@ function saveRecord(kind, id, values) {
   }
   if (kind === "tuition") return createTuition(values);
   if (kind === "rates") return saveHourlyRates(values);
+  if (kind === "planrates") return savePlanRates(values);
   if (kind === "therapist") return saveTherapist(values);
   if (kind === "staff") return saveStaff(id, values);
   if (kind === "finance" && values.type === "Mensalidade" && values.relatedType === "Aluno") return saveTuitionFinance(id, values);
@@ -1580,14 +1611,20 @@ function saveTuitionFinance(id, values) {
   const plan = planById(student.planId);
   tuition.type = "Mensalidade";
   tuition.description = student.name;
-  tuition.amount = Number(values.amount || plan?.monthly || 0);
+  const amount = Number(values.amount || plan?.monthly || 0);
+  const planAmount = Number(plan?.monthly || 0);
+  tuition.amount = amount;
   tuition.date = values.date || billingDateForStudent(student, values.competence || currentCompetence());
   tuition.status = values.status || "Pendente";
   tuition.center = "Operação";
   tuition.relatedType = "Aluno";
   tuition.relatedId = student.id;
   tuition.competence = values.competence || currentCompetence();
-  if (previousPlanId !== student.planId && !values.amount) tuition.amount = Number(plan?.monthly || 0);
+  tuition.manualAmount = Math.abs(amount - planAmount) > 0.009;
+  if (previousPlanId !== student.planId && !values.amount) {
+    tuition.amount = planAmount;
+    tuition.manualAmount = false;
+  }
 
   saveState();
   notify("Aluno e mensalidade atualizados.");
@@ -1609,6 +1646,7 @@ function createTuition(values) {
     existing.date = values.date || billingDateForStudent(student, competence);
     existing.status = values.status || "Pendente";
     existing.competence = competence;
+    existing.manualAmount = Math.abs(Number(existing.amount || 0) - Number(plan.monthly || 0)) > 0.009;
     saveState();
     notify("Mensalidade atualizada.");
     return true;
@@ -1623,7 +1661,8 @@ function createTuition(values) {
     center: "Operação",
     relatedType: "Aluno",
     relatedId: student.id,
-    competence
+    competence,
+    manualAmount: Boolean(values.amount && Math.abs(Number(values.amount || 0) - Number(plan.monthly || 0)) > 0.009)
   });
   saveState();
   notify("Mensalidade gerada.");
@@ -1669,6 +1708,46 @@ function saveHourlyRates(values) {
   saveState();
   notify("Valores de referência atualizados.");
   return true;
+}
+
+function savePlanRates(values) {
+  const basico = Number(values.basicPlanRate || defaultPlanPrices.basico);
+  const completo = Number(values.completePlanRate || defaultPlanPrices.completo);
+  updatePlanPrice("basico", basico);
+  updatePlanPrice("completo", completo);
+  syncPlanTuitions();
+  saveState();
+  notify("Valores dos pacotes atualizados.");
+  return true;
+}
+
+function updatePlanPrice(planId, monthly) {
+  const plan = state.plans.find((item) => item.id === planId);
+  if (plan) {
+    plan.monthly = Number(monthly || 0);
+    return;
+  }
+  state.plans.push({ id: planId, name: planId === "basico" ? "Básico" : "Completo", monthly: Number(monthly || 0) });
+}
+
+function syncPlanTuitions() {
+  state.finance.forEach((item) => {
+    if (!shouldAutoUpdateTuition(item)) return;
+    const student = studentById(item.relatedId);
+    const plan = student ? planById(student.planId) : null;
+    if (!plan) return;
+    item.amount = Number(plan.monthly || 0);
+    item.description = student.name;
+    item.center = "Operação";
+    item.relatedType = "Aluno";
+  });
+}
+
+function shouldAutoUpdateTuition(item) {
+  if (item.type !== "Mensalidade" || item.relatedType !== "Aluno") return false;
+  if (["Pago", "Cancelado"].includes(displayText(item.status))) return false;
+  if (item.manualAmount) return false;
+  return financeCompetence(item) >= currentCompetence();
 }
 
 function saveTeamFinance(id, values) {
@@ -2055,6 +2134,18 @@ function fieldsFor(kind, record) {
       </section>
     `;
   }
+  if (kind === "planrates") {
+    return `
+      <section class="drawer-section">
+        <h3>Valores dos pacotes</h3>
+        <div class="field-grid">
+          ${inputField("basicPlanRate", "Pacote Básico", planById("basico")?.monthly || defaultPlanPrices.basico, "number")}
+          ${inputField("completePlanRate", "Pacote Completo", planById("completo")?.monthly || defaultPlanPrices.completo, "number")}
+        </div>
+        <p class="drawer-note">Ao salvar, mensalidades pendentes do mês atual e futuras serão atualizadas. Mensalidades pagas ou editadas manualmente serão preservadas.</p>
+      </section>
+    `;
+  }
   return "";
 }
 
@@ -2288,7 +2379,7 @@ function collectionFor(kind) {
 }
 
 function drawerTitle(kind, isEdit) {
-  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lançamento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta", staff: "profissional", rates: "valores de referência" };
+  const names = { student: "aluno", class: "turma", wait: "interessado", workshop: "oficina", finance: "lançamento", cost: "custo", tuition: "mensalidade", therapist: "terapeuta", staff: "profissional", rates: "valores de referência", planrates: "valores dos pacotes" };
   return `${isEdit ? "Editar" : "Criar"} ${names[kind] || "registro"}`;
 }
 
@@ -2395,7 +2486,10 @@ function syncTuitionForStudent(studentId, options = {}) {
   tuition.center = "Operação";
   tuition.relatedType = "Aluno";
   tuition.relatedId = student.id;
-  if (options.forcePlanAmount) tuition.amount = Number(plan?.monthly || 0);
+  if (options.forcePlanAmount || !tuition.manualAmount) {
+    tuition.amount = Number(plan?.monthly || 0);
+    tuition.manualAmount = false;
+  }
   tuition.competence = current;
   tuition.date = billingDateForStudent(student, current);
   return true;
@@ -2413,7 +2507,8 @@ function createStudentTuition(student, competence = currentCompetence()) {
     center: "Operação",
     relatedType: "Aluno",
     relatedId: student.id,
-    competence
+    competence,
+    manualAmount: false
   });
 }
 
